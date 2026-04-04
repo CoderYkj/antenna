@@ -26,7 +26,9 @@ FEATURE_COLS = [
 
 
 def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
-    """计算技术指标，返回带有所有指标列的 DataFrame（不删除 NaN 行）。"""
+    """计算技术指标，返回带有所有指标列的 DataFrame（不删除 NaN 行）。
+    数据不足时各指标填 NaN，不抛异常。
+    """
     df = df.copy()
 
     # 均线
@@ -35,17 +37,24 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
     # 均线偏离度
     for period in [5, 10, 20, 60]:
-        df[f"ma{period}_dev"] = (df["close"] - df[f"ma{period}"]) / df[f"ma{period}"]
+        ma = df[f"ma{period}"]
+        df[f"ma{period}_dev"] = (df["close"] - ma) / ma
 
-    # MACD
+    # MACD（需要至少 26 行）
     macd = ta.macd(df["close"])
-    df["macd_dif"] = macd["MACD_12_26_9"]
-    df["macd_dea"] = macd["MACDs_12_26_9"]
-    df["macd_hist"] = macd["MACDh_12_26_9"]
+    if macd is not None and not macd.empty:
+        df["macd_dif"] = macd["MACD_12_26_9"]
+        df["macd_dea"] = macd["MACDs_12_26_9"]
+        df["macd_hist"] = macd["MACDh_12_26_9"]
+    else:
+        df["macd_dif"] = float("nan")
+        df["macd_dea"] = float("nan")
+        df["macd_hist"] = float("nan")
 
     # RSI
     for period in [6, 12, 24]:
-        df[f"rsi{period}"] = ta.rsi(df["close"], length=period)
+        rsi = ta.rsi(df["close"], length=period)
+        df[f"rsi{period}"] = rsi if rsi is not None else float("nan")
 
     # KDJ（用 Stochastic 近似）
     stoch = ta.stoch(df["high"], df["low"], df["close"])
@@ -59,14 +68,15 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
         df["kdj_j"] = float("nan")
 
     # CCI
-    df["cci"] = ta.cci(df["high"], df["low"], df["close"])
+    cci = ta.cci(df["high"], df["low"], df["close"])
+    df["cci"] = cci if cci is not None else float("nan")
 
-    # 布林带（20 日，2 倍标准差）- 使用位置索引兼容不同版本列名
+    # 布林带（20 日，2 倍标准差）
     bb = ta.bbands(df["close"], length=20)
     if bb is not None and not bb.empty:
-        df["bb_lower"] = bb.iloc[:, 0]   # BBL
-        df["bb_mid"] = bb.iloc[:, 1]     # BBM
-        df["bb_upper"] = bb.iloc[:, 2]   # BBU
+        df["bb_lower"] = bb.iloc[:, 0]
+        df["bb_mid"] = bb.iloc[:, 1]
+        df["bb_upper"] = bb.iloc[:, 2]
         df["bb_width"] = (df["bb_upper"] - df["bb_lower"]) / df["bb_mid"]
     else:
         df["bb_upper"] = float("nan")
@@ -75,13 +85,15 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
         df["bb_width"] = float("nan")
 
     # ATR
-    df["atr"] = ta.atr(df["high"], df["low"], df["close"])
+    atr = ta.atr(df["high"], df["low"], df["close"])
+    df["atr"] = atr if atr is not None else float("nan")
 
     # 量比（当日成交量 / 5 日均量）
     df["vol_ratio"] = df["volume"] / df["volume"].rolling(5).mean()
 
     # OBV
-    df["obv"] = ta.obv(df["close"], df["volume"])
+    obv = ta.obv(df["close"], df["volume"])
+    df["obv"] = obv if obv is not None else float("nan")
 
     # 价格衍生
     df["pct_change"] = df["close"].pct_change()
