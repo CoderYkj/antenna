@@ -8,6 +8,13 @@ A股分析预测工具 CLI
   python cli.py scan [--top 20]
   python cli.py report 600519
 """
+import sys
+import io
+
+# Windows 终端默认 GBK，强制 UTF-8 输出避免中文乱码
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 import argparse
 import sys
 import webbrowser
