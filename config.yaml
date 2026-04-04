@@ -10,7 +10,7 @@ universe:
     - "601318"   # 中国平安
     - "000001"   # 平安银行
     - "600036"   # 招商银行
-  scan_pool: watchlist  # watchlist 或 hs300（后续扩展）
+  scan_pool: all  # watchlist（自选）或 all（全 A 股，需先 fetch --all）
 
 model:
   target_days: 5
