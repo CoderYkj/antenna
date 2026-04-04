@@ -4,11 +4,6 @@ from pathlib import Path
 
 CACHE_DIR = Path(__file__).parent / "cache"
 
-_RENAME_MAP = {
-    "日期": "date", "开盘": "open", "收盘": "close",
-    "最高": "high", "最低": "low", "成交量": "volume",
-    "成交额": "amount", "换手率": "turnover",
-}
 _COLS = ["date", "open", "high", "low", "close", "volume", "amount", "turnover"]
 
 
@@ -39,12 +34,18 @@ def fetch_stock_hist(code: str, days: int = 365) -> pd.DataFrame:
     return df
 
 
+def _code_to_sina_symbol(code: str) -> str:
+    """将纯数字代码转为新浪格式：600519 → sh600519，000858 → sz000858。"""
+    return f"sh{code}" if code.startswith("6") else f"sz{code}"
+
+
 def _fetch_from_akshare(code: str, start_date: str, end_date: str) -> pd.DataFrame:
-    raw = ak.stock_zh_a_hist(
-        symbol=code, period="daily",
-        start_date=start_date, end_date=end_date,
-        adjust="qfq",
-    )
-    df = raw.rename(columns=_RENAME_MAP)
-    df["date"] = pd.to_datetime(df["date"])
-    return df[[c for c in _COLS if c in df.columns]]
+    """使用新浪数据源拉取日线数据（东方财富源在当前环境不可用）。"""
+    symbol = _code_to_sina_symbol(code)
+    raw = ak.stock_zh_a_daily(symbol=symbol, adjust="qfq")
+    raw["date"] = pd.to_datetime(raw["date"])
+    # 按日期范围过滤
+    start = pd.to_datetime(start_date)
+    end = pd.to_datetime(end_date)
+    df = raw[(raw["date"] >= start) & (raw["date"] <= end)].copy()
+    return df[[c for c in _COLS if c in df.columns]].reset_index(drop=True)
