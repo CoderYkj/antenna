@@ -11,10 +11,12 @@ hit_tier: 按次日涨幅分档
   hit_5d:          5 日累计涨幅(%)
   max_drawdown_5d: 5 日内最大回撤(%),负值
 """
+import math
 from typing import Sequence
 
 
 def compute_hit_tier(actual_pct: float | None) -> str | None:
+    """Map next-day percentage gain to a categorical tier. None input yields None."""
     if actual_pct is None:
         return None
     if actual_pct < 1.0:
@@ -37,17 +39,22 @@ def compute_5d_metrics(closes: Sequence[float]) -> dict | None:
     if not closes or len(closes) < 5:
         return None
 
-    base = closes[0]
+    window = closes[:5]
+
+    if any(c is None or not math.isfinite(c) for c in window):
+        return None
+
+    base = window[0]
     if base == 0:
         return None
 
     # 累计涨幅
-    cumulative = (closes[-1] / base - 1.0) * 100.0
+    cumulative = (window[-1] / base - 1.0) * 100.0
 
     # 最大回撤:沿时间序列追踪 running peak,每点计算相对当前 peak 的回撤,取最小(最深)
     max_dd = 0.0
-    running_peak = closes[0]
-    for c in closes:
+    running_peak = window[0]
+    for c in window:
         if c > running_peak:
             running_peak = c
         dd = (c / running_peak - 1.0) * 100.0

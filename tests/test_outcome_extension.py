@@ -46,3 +46,18 @@ class TestCompute5dMetrics:
 
     def test_metrics_single_value_returns_none(self):
         assert compute_5d_metrics([100]) is None
+
+    def test_metrics_nan_in_closes_returns_none(self):
+        """NaN 或 None 输入应返回 None,避免下游拿到污染数据。"""
+        import math
+        assert compute_5d_metrics([100.0, float("nan"), 102.0, 103.0, 104.0]) is None
+        assert compute_5d_metrics([100.0, None, 102.0, 103.0, 104.0]) is None
+        assert compute_5d_metrics([100.0, math.inf, 102.0, 103.0, 104.0]) is None
+
+    def test_metrics_clamps_to_first_5_when_given_more(self):
+        """长度 >5 时按前 5 元素计算,使返回稳定为 5 日指标。"""
+        # 7 elements: first 5 are [100, 103, 98, 105, 107] → hit_5d=7.0
+        closes = [100.0, 103.0, 98.0, 105.0, 107.0, 80.0, 80.0]
+        metrics = compute_5d_metrics(closes)
+        assert metrics["hit_5d"] == pytest.approx(7.0, abs=0.01)
+        assert metrics["max_drawdown_5d"] == pytest.approx(-4.85, abs=0.05)
