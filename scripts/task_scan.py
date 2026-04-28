@@ -65,6 +65,7 @@ def main():
             "pred_high":  pi.get("pred_high"),
             "pred_low":   pi.get("pred_low"),
             "open":       pi.get("open"),
+            "scene":      "scan",
         })
     if snapshot:
         log_predictions(datetime.now().strftime("%Y-%m-%d"), snapshot)

@@ -1030,6 +1030,7 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
             "scan_date":       scan_date,
             "pred_high":       r["price_info"].get("pred_high"),
             "pred_low":        r["price_info"].get("pred_low"),
+            "scene":           "scan",
         })
 
     # 自选股中未入 Top N 的，额外写快照（标记 watchlist=True）
@@ -1057,6 +1058,7 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
                     "pred_high":       r["price_info"].get("pred_high"),
                     "pred_low":        r["price_info"].get("pred_low"),
                     "watchlist":  True,
+                    "scene":      "scan",
                 })
 
     log_predictions(pred_date, snapshot)
@@ -1979,6 +1981,7 @@ def cmd_backtest_bot(arg: str = None, top_n: int = 10,
                 "rise_prob":  round(r["rise_prob"], 4),
                 "confidence": r.get("confidence", ""),
                 "scan_date":  trade_str,
+                "scene":      "scan",
             } for r in top]
             log_predictions(pred_str, snapshot)
 

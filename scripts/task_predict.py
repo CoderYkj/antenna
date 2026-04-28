@@ -141,6 +141,8 @@ def run():
                 "pred_high":  pi.get("pred_high"),
                 "pred_low":   pi.get("pred_low"),
                 "open":       pi.get("open"),
+                "scene":      "predict",
+                "watchlist":  True,
             })
         log_predictions(now.strftime("%Y-%m-%d"), snapshot)
         print(f"[task_predict] 已写入 {len(snapshot)} 只自选股预测快照（复盘基准）")
