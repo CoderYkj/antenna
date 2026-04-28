@@ -57,3 +57,28 @@ def test_atomic_write_does_not_leave_tmp(workdir):
     assert target.exists()
     # 确保没有遗留的 .tmp
     assert not list(target.parent.glob("*.tmp"))
+
+
+def test_envelope_keys_take_precedence_over_payload(workdir):
+    """payload 中若包含同名 envelope key,envelope 应优先(module/date/written_at)。"""
+    feedback_io.write_feedback("real_module", "2026-04-28", {
+        "module":     "EVIL",          # 不应覆盖
+        "date":       "1999-01-01",    # 不应覆盖
+        "written_at": "forged",         # 不应覆盖
+        "samples":    42,
+    })
+    path = workdir / "feedback" / "real_module_2026-04-28.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    assert data["module"] == "real_module"
+    assert data["date"] == "2026-04-28"
+    assert data["written_at"] != "forged"
+    assert data["samples"] == 42
+
+
+def test_atomic_write_on_tmp_suffix_path(workdir):
+    """即使目标路径自身以 .tmp 结尾,也不会发生 temp/target 冲突。"""
+    target = workdir / "weird.tmp"
+    feedback_io.atomic_write_json(target, {"k": "v"})
+    assert target.exists()
+    # temp 命名应是 weird.tmp.tmp,不会与 target 同名
+    assert not (workdir / "weird.tmp.tmp").exists()
