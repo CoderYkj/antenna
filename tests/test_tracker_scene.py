@@ -60,3 +60,34 @@ def test_log_predictions_same_code_different_scene_coexist(tmp_path, monkeypatch
     loaded = tracker.load_predictions("2026-04-03")
     scenes = sorted(r["scene"] for r in loaded)
     assert scenes == ["scan", "tactic:value"]
+
+
+def test_load_predictions_by_scene_normalises_null_scene(tmp_path, monkeypatch):
+    """scene=null (JSON null → Python None) 应被归入 scan 并输出规范化的 scene 字段。"""
+    monkeypatch.setattr(tracker, "DATA_DIR", tmp_path)
+    path = tmp_path / "pred_2026-04-04.jsonl"
+    path.write_text(
+        '{"code":"X","name":"X","signal":"买入","rise_prob":0.7,"scene":null}\n',
+        encoding="utf-8",
+    )
+    result = tracker.load_predictions_by_scene("2026-04-04", "scan")
+    assert len(result) == 1
+    assert result[0]["scene"] == "scan"
+
+
+def test_log_predictions_does_not_mutate_caller_dicts(tmp_path, monkeypatch):
+    """log_predictions 不应修改调用方传入的 dict(免疫性)。"""
+    monkeypatch.setattr(tracker, "DATA_DIR", tmp_path)
+    original = {"code": "600519", "name": "贵州茅台", "signal": "买入", "rise_prob": 0.7}
+    snapshot = {k: v for k, v in original.items()}  # deep-ish copy of keys
+    tracker.log_predictions("2026-04-05", [original])
+    assert original == snapshot, "caller dict was mutated"
+
+
+def test_log_outcomes_does_not_mutate_caller_dicts(tmp_path, monkeypatch):
+    """log_outcomes 不应向调用方的 value-dict 注入 code 字段。"""
+    monkeypatch.setattr(tracker, "DATA_DIR", tmp_path)
+    outcomes = {"600519": {"actual_open": 100, "actual_close": 105, "actual_pct": 5.0}}
+    snapshot = {k: dict(v) for k, v in outcomes.items()}
+    tracker.log_outcomes("2026-04-06", outcomes)
+    assert outcomes == snapshot, "caller outcomes dict was mutated"

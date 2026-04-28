@@ -82,12 +82,12 @@ def log_predictions(date_str: str, records: Iterable[dict]):
                     except Exception:
                         pass
 
+    now_iso = datetime.now().isoformat(timespec="seconds")
     for r in records:
-        if "scene" not in r:
-            r["scene"] = DEFAULT_SCENE
-        if "ts" not in r:
-            r["ts"] = datetime.now().isoformat(timespec="seconds")
-        existing[_record_key(r)] = r
+        stamped = dict(r)
+        stamped.setdefault("scene", DEFAULT_SCENE)
+        stamped.setdefault("ts", now_iso)
+        existing[_record_key(stamped)] = stamped
 
     with open(path, "w", encoding="utf-8") as f:
         for r in sorted(existing.values(), key=lambda x: (x["code"], _get_scene(x))):
@@ -107,7 +107,7 @@ def load_predictions(date_str: str) -> list[dict]:
                 try:
                     out.append(json.loads(line))
                 except json.JSONDecodeError:
-                    pass
+                    pass  # 跳过损坏行,不影响其余记录
     return out
 
 
@@ -126,10 +126,8 @@ def load_predictions_by_scene(date_str: str, scene: str) -> list[dict]:
         rs = _get_scene(r)
         matched = (scene == rs) or (scene == "tactic" and rs.startswith(SCENE_TACTIC_PREFIX))
         if matched:
-            # Normalize: stamp scene onto backward-compat records missing the field
-            if "scene" not in r:
-                r = {**r, "scene": rs}
-            out.append(r)
+            # Normalize: stamp scene when record's scene differs from computed rs
+            out.append({**r, "scene": rs} if r.get("scene") != rs else r)
     return out
 
 
@@ -154,8 +152,7 @@ def log_outcomes(date_str: str, outcomes: dict[str, dict]):
     path = DATA_DIR / f"outcome_{date_str}.jsonl"
     with open(path, "w", encoding="utf-8") as f:
         for code, r in outcomes.items():
-            r["code"] = code
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
+            f.write(json.dumps({**r, "code": code}, ensure_ascii=False) + "\n")
 
 
 def load_outcomes(date_str: str) -> dict[str, dict]:
@@ -167,6 +164,9 @@ def load_outcomes(date_str: str) -> dict[str, dict]:
         for line in f:
             line = line.strip()
             if line:
-                r = json.loads(line)
+                try:
+                    r = json.loads(line)
+                except json.JSONDecodeError:
+                    continue  # 跳过损坏行,不影响其余记录
                 out[r["code"]] = r
     return out
