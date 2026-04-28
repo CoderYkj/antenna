@@ -1620,6 +1620,32 @@ def _tactic_run(strategy: str, top_n: int, all_codes: list,
     scored.sort(key=lambda x: -x["score"])
     top = scored[:top_n]
 
+    # P0: 写入 tactic 场景的 pred 快照(供学习反馈使用)
+    try:
+        from learning.tracker import log_predictions
+        from learning.market_state import load_current_state
+
+        current_state = load_current_state().get("current", "range")
+        scan_date_str = datetime.now().strftime("%Y-%m-%d")
+        scene_tag     = f"tactic:{strategy}"
+
+        tactic_snapshot = [{
+            "code":         t["code"],
+            "name":         name_map.get(t["code"], t["code"]),
+            "signal":       "买入",
+            "rise_prob":    round(t.get("rise_prob", 0.0), 4),
+            "confidence":   "",
+            "scan_date":    scan_date_str,
+            "scene":        scene_tag,
+            "market_state": current_state,
+            "tactic_hits":  [strategy],
+        } for t in top]
+
+        if tactic_snapshot:
+            log_predictions(scan_date_str, tactic_snapshot)
+    except Exception as _e:
+        print(f"[_tactic_run] pred 快照落盘失败(忽略): {_e}")
+
     # ── Step 3: 获取实时价格 ────────────────────────────────────────
     try:
         rt_prices = fetch_realtime_prices([t["code"] for t in top])
