@@ -283,3 +283,11 @@ def send_train_complete(webhook_url: str, elapsed_seconds: float = 0) -> bool:
 
 
 send_train_done = send_train_complete   # 兼容 task_train.py
+
+
+def send_text(webhook_url: str, text: str) -> bool:
+    """发送纯文本消息(学习系统告警用)。"""
+    if not webhook_url:
+        return False
+    payload = {"msg_type": "text", "content": {"text": text}}
+    return _post(webhook_url, payload)
