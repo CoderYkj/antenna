@@ -1,0 +1,54 @@
+{
+  "periods": [
+    {
+      "period": "2026",
+      "period_type": "year",
+      "start": "2026-01-01",
+      "end": "2026-12-31",
+      "total_buy_sigs": 587,
+      "total_hits": 181,
+      "accuracy": 0.3083,
+      "trading_days": 60,
+      "days_with_buys": 59,
+      "best_day": {
+        "date": "2026-03-24",
+        "hits": 10,
+        "total": 10,
+        "accuracy": 1.0
+      },
+      "worst_day": {
+        "date": "2026-01-07",
+        "hits": 0,
+        "total": 10,
+        "accuracy": 0.0
+      },
+      "final_buy_top_pct": 0.14,
+      "completed_at": "2026-04-16T23:35:40.368276"
+    },
+    {
+      "period": "2026-04",
+      "period_type": "month",
+      "start": "2026-04-01",
+      "end": "2026-04-30",
+      "total_buy_sigs": 160,
+      "total_hits": 54,
+      "accuracy": 0.3375,
+      "trading_days": 17,
+      "days_with_buys": 16,
+      "best_day": {
+        "date": "2026-04-08",
+        "hits": 8,
+        "total": 10,
+        "accuracy": 0.8
+      },
+      "worst_day": {
+        "date": "2026-04-14",
+        "hits": 0,
+        "total": 10,
+        "accuracy": 0.0
+      },
+      "final_buy_top_pct": 0.08,
+      "completed_at": "2026-04-25T15:42:09.891397"
+    }
+  ]
+}

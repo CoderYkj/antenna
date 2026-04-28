@@ -1,5 +1,22 @@
+# Python bytecode
 *.pyc
 __pycache__/
+
+# Project runtime artifacts
 data/cache/
 models/saved/
 reports/output/
+
+# Logs
+logs/
+*.log
+
+# Claude Code internal
+.claude/
+
+# Binaries (should not be in repo)
+*.exe
+
+# Noise files (accidentally created by shell)
+Look
+Set
