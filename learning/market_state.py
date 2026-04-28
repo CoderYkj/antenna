@@ -9,12 +9,14 @@ market_state.py - 大盘状态打标(bull/bear/range),服务于所有 learner �
 产物:learning/market_state.json
 """
 import json
+import logging
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 STATE_FILE = Path("learning/market_state.json")
 DEBOUNCE_DAYS = 3  # 连续 N 日触发才切换
@@ -56,22 +58,19 @@ def compute_state(hs300_df: pd.DataFrame) -> dict:
         "ma60":    float,
         "ret_60d": float,
         "atr_pct": float,
-        "reason":  Optional[str],   # "insufficient_data" 等
+        "reason":  str | None,   # "insufficient_data" 等
       }
     """
-    if hs300_df is None or len(hs300_df) < 60:
+    if hs300_df is None or len(hs300_df) < 61:
         return {"state": DEFAULT_STATE, "reason": "insufficient_data"}
 
     df = hs300_df.tail(90).copy().reset_index(drop=True)
     df["ma60"] = df["close"].rolling(60).mean()
 
-    last_close = float(df["close"].iloc[-1])
-    last_ma60 = float(df["ma60"].iloc[-1])
-    if len(df) >= 60:
-        price_60_ago = float(df["close"].iloc[-60])
-    else:
-        price_60_ago = float(df["close"].iloc[0])
-    ret_60d = (last_close / price_60_ago - 1.0) if price_60_ago else 0.0
+    last_close   = float(df["close"].iloc[-1])
+    last_ma60    = float(df["ma60"].iloc[-1])
+    price_60_ago = float(df["close"].iloc[-61])
+    ret_60d      = (last_close / price_60_ago - 1.0) if price_60_ago else 0.0
 
     hi = df["high"] if "high" in df.columns else df["close"]
     lo = df["low"] if "low" in df.columns else df["close"]
@@ -119,63 +118,83 @@ def load_state_on_date(date_str: str) -> str:
     return matching[-1]["state"]
 
 
+def _apply_debounce(
+    *,
+    raw_state: str,
+    current: str,
+    pending: str | None,
+    pending_days: int,
+    since: str | None,
+    date_str: str,
+) -> tuple[str, str | None, int, str | None]:
+    """
+    应用 3 日防抖,返回 (new_current, new_pending, new_pending_days, new_since)。
+
+    规则见 update_state docstring。
+    """
+    first_time = since is None
+
+    if first_time:
+        return raw_state, None, 0, date_str
+    if raw_state == current:
+        return current, None, 0, since
+    if raw_state == pending:
+        new_pending_days = pending_days + 1
+        if new_pending_days >= DEBOUNCE_DAYS:
+            return pending, None, 0, date_str
+        return current, pending, new_pending_days, since
+    # raw_state 既不是 current 也不是 pending → 重新开始计数
+    return current, raw_state, 1, since
+
+
 def update_state(hs300_df: pd.DataFrame, date_str: str) -> dict:
     """
     基于最新 hs300_df 更新状态(含防抖);追加 history 一条并落盘。
 
-    防抖规则:
-      - 若 raw_state == current:直接 append history,pending 清空
-      - 若 raw_state != current 但 == pending:计数 +1;达到 DEBOUNCE_DAYS 切 current
-      - 若 raw_state 不同于 current 也不同于 pending:pending = raw_state,计数重置
-      - 首次(current 为 DEFAULT_STATE 且 since=None):允许立即设置
+    防抖规则(连续 DEBOUNCE_DAYS 天看到同一新状态才切换):
+      - 首次(since=None)→ 立即设置 current=raw_state
+      - raw_state == current → 维持,清空 pending
+      - raw_state == pending → pending_days += 1;达到 DEBOUNCE_DAYS 时切换 current = pending
+      - raw_state != current 也 != pending → pending = raw_state, pending_days = 1(从今天起重新计数)
+
+    示例(DEBOUNCE_DAYS=3):
+      Day1 bull(current=bull)
+      Day2 bear → pending=bear, pending_days=1
+      Day3 bear → pending_days=2
+      Day4 bear → pending_days=3,触发切换 current=bear
+      即看到 3 个连续 bear 信号后切换。
     """
     raw = compute_state(hs300_df)
     raw_state = raw["state"]
     data = load_current_state()
 
-    current = data.get("current", DEFAULT_STATE)
-    pending = data.get("pending")
-    pending_days = data.get("pending_days", 0)
+    new_current, new_pending, new_pending_days, new_since = _apply_debounce(
+        raw_state=raw_state,
+        current=data.get("current", DEFAULT_STATE),
+        pending=data.get("pending"),
+        pending_days=data.get("pending_days", 0),
+        since=data.get("since"),
+        date_str=date_str,
+    )
 
-    first_time = data.get("since") is None
+    history = (data.get("history") or []) + [{"date": date_str, "state": new_current}]
+    history = history[-90:]
 
-    if first_time:
-        new_current = raw_state
-        new_pending = None
-        new_pending_days = 0
-        new_since = date_str
-    elif raw_state == current:
-        new_current = current
-        new_pending = None
-        new_pending_days = 0
-        new_since = data.get("since")
-    elif raw_state == pending:
-        new_pending_days = pending_days + 1
-        if new_pending_days >= DEBOUNCE_DAYS:
-            new_current = pending
-            new_pending = None
-            new_pending_days = 0
-            new_since = date_str
-        else:
-            new_current = current
-            new_pending = pending
-            new_since = data.get("since")
-    else:
-        new_current = current
-        new_pending = raw_state
-        new_pending_days = 1
-        new_since = data.get("since")
-
-    history = data.get("history") or []
-    history.append({"date": date_str, "state": new_current})
-    history = history[-90:]  # 最近 90 日
+    hs300_metrics = {
+        "close":   raw.get("close"),
+        "ma60":    raw.get("ma60"),
+        "ret_60d": raw.get("ret_60d"),
+        "atr_pct": raw.get("atr_pct"),
+    }
+    if raw.get("reason"):
+        hs300_metrics["reason"] = raw["reason"]
 
     new_data = {
         "current":      new_current,
         "since":        new_since,
         "pending":      new_pending,
         "pending_days": new_pending_days,
-        "hs300":        {k: v for k, v in raw.items() if k != "state"},
+        "hs300":        hs300_metrics,
         "history":      history,
         "updated_at":   datetime.now().isoformat(timespec="seconds"),
     }
@@ -183,15 +202,13 @@ def update_state(hs300_df: pd.DataFrame, date_str: str) -> dict:
     return new_data
 
 
-def run(date_str: Optional[str] = None) -> dict:
-    """
-    编排器入口:拉沪深 300 数据并更新状态。
-    失败时抛异常,由编排器捕获。
-    """
+def run(date_str: str | None = None) -> dict:
+    """编排器入口:拉沪深 300 数据并更新状态。失败抛异常,由编排器捕获。"""
     from data.fetcher import fetch_stock_hist
     try:
         df = fetch_stock_hist("sh000300", days=120)
-    except Exception:
+    except Exception as exc:
+        logger.warning("sh000300 fetch failed (%s); retrying with 000300", exc)
         df = fetch_stock_hist("000300", days=120)
 
     if df is None or df.empty:
