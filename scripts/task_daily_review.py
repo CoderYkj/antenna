@@ -102,6 +102,12 @@ def run():
     if not outcomes:
         print("[review] 无法获取实际收盘数据，跳过。")
         return
+
+    # P0: 即时补 hit_tier(5 日指标由 task_fill_5d_metrics 延迟回填)
+    from learning.outcome_metrics import compute_hit_tier
+    for code, r in outcomes.items():
+        r["hit_tier"] = compute_hit_tier(r.get("actual_pct"))
+
     log_outcomes(date_str, outcomes)
     print(f"[review] 已记录 {len(outcomes)} 只实际结果")
 
@@ -122,6 +128,24 @@ def run():
     from notify.feishu import send_review_report
     ok = send_review_report(webhook, report)
     print("[review] 飞书推送成功。" if ok else "[review] 飞书推送失败。")
+
+    # ── 调用学习编排器 ──────────────────────────────────
+    print("[review] 启动学习管线 ...")
+    try:
+        from learning.orchestrator import run_all
+        results = run_all(date_str=date_str)
+        ok_cnt  = sum(1 for r in results.values() if r["status"] == "ok")
+        failed  = sum(1 for r in results.values() if r["status"] == "failed")
+        print(f"[review] 学习管线完成: ok={ok_cnt} failed={failed}")
+    except Exception as e:
+        print(f"[review] 学习管线异常(忽略,不影响其他): {e}")
+
+    # ── 5 日指标回填(对 7 日前的 outcome) ─────────────────
+    try:
+        from scripts.task_fill_5d_metrics import run as fill_5d_run
+        fill_5d_run()
+    except Exception as e:
+        print(f"[review] 5 日指标回填异常(忽略): {e}")
 
 
 if __name__ == "__main__":
