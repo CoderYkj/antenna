@@ -1,0 +1,5 @@
+{"code":"600519","name":"贵州茅台","signal":"买入","rise_prob":0.75,"scene":"scan"}
+{"code":"600519","name":"贵州茅台","signal":"买入","rise_prob":0.72,"scene":"tactic:value"}
+{"code":"000001","name":"平安银行","signal":"观望","rise_prob":0.55,"scene":"scan"}
+{"code":"300750","name":"宁德时代","signal":"买入","rise_prob":0.81,"scene":"predict","watchlist":true}
+{"code":"600036","name":"招商银行","signal":"买入","rise_prob":0.68}
