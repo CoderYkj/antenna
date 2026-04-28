@@ -1,3 +1,5 @@
+import pytest
+
 from learning.scene_bucket import bucket_by_scene, bucket_by_state, merge_buckets
 
 
@@ -45,3 +47,23 @@ def test_merge_buckets_by_scene_then_state():
 
 def test_bucket_by_scene_empty_input():
     assert bucket_by_scene([]) == {}
+
+
+def test_bucket_by_state_empty_input():
+    assert bucket_by_state([]) == {}
+
+
+def test_merge_buckets_empty_input():
+    assert merge_buckets([], by=("scene", "market_state")) == {}
+
+
+def test_merge_buckets_unknown_dimension_raises():
+    with pytest.raises(ValueError, match="unknown dimension"):
+        merge_buckets(SAMPLE_PREDS, by=("scene", "bad_key"))
+
+
+def test_merge_buckets_record_missing_both_fields_uses_defaults():
+    """记录同时缺 scene 和 market_state 时应归入 (scan, range)。"""
+    records = [{"code": "X", "rise_prob": 0.5}]
+    buckets = merge_buckets(records, by=("scene", "market_state"))
+    assert buckets[("scan", "range")] == records

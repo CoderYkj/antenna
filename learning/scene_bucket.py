@@ -36,11 +36,22 @@ def bucket_by_state(records: Iterable[dict]) -> dict[str, list[dict]]:
 
 
 def merge_buckets(records: Iterable[dict], by: tuple[str, ...]) -> dict[tuple, list[dict]]:
-    """多维组合分桶。by=("scene", "market_state") 返回 {(scene, state): [...]}"""
+    """
+    多维组合分桶。by=("scene", "market_state") 返回 {(scene, state): [...]}
+
+    Raises:
+        ValueError: 当 by 中包含未知维度时(有效维度:scene、market_state)。
+    """
     extractors = {
-        "scene":        _scene,
+        "scene": _scene,
         "market_state": _state,
     }
+    unknown = set(by) - extractors.keys()
+    if unknown:
+        raise ValueError(
+            f"merge_buckets: unknown dimension(s) {sorted(unknown)}. "
+            f"Valid: {sorted(extractors)}"
+        )
     out: dict[tuple, list[dict]] = defaultdict(list)
     for r in records:
         key = tuple(extractors[k](r) for k in by)
