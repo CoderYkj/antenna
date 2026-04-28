@@ -182,6 +182,43 @@ def cmd_report(args, config):
     webbrowser.open(f"file:///{Path(path).resolve()}")
 
 
+# ── learn ──────────────────────────────────────────────────────────────────
+
+def cmd_learn(args, config):
+    """
+    learn:运行所有学习子模块(P0 仅含 market_state;P1-P4 阶段性追加)。
+
+    用法:
+      python cli.py learn                # 用今天日期
+      python cli.py learn --date 2026-04-27
+      python cli.py learn --dry-run
+      python cli.py learn --check        # 仅做自检(不运行)
+    """
+    from datetime import datetime
+    from learning import orchestrator
+
+    if args.check:
+        sys.exit(orchestrator.check())
+
+    date_str = args.date or datetime.now().strftime("%Y-%m-%d")
+    print(f"[learn] 执行日期: {date_str}{' (dry-run)' if args.dry_run else ''}")
+
+    results = orchestrator.run_all(date_str=date_str, dry_run=args.dry_run)
+
+    ok      = sum(1 for r in results.values() if r["status"] == "ok")
+    failed  = sum(1 for r in results.values() if r["status"] == "failed")
+    skipped = sum(1 for r in results.values() if r["status"] == "skipped")
+    dry     = sum(1 for r in results.values() if r["status"] == "dry_run")
+
+    print(f"[learn] 完成: ok={ok} failed={failed} skipped={skipped} dry_run={dry}")
+    for name, r in results.items():
+        print(f"  - {name}: {r['status']}")
+        if r["status"] == "failed":
+            print(f"    error: {r['error']}")
+
+    sys.exit(1 if failed else 0)
+
+
 # ── main ───────────────────────────────────────────────────────────────────
 
 def main():
@@ -209,6 +246,11 @@ def main():
     p = sub.add_parser("report", help="生成 HTML 报告（不重新预测）")
     p.add_argument("code", help="股票代码")
 
+    p = sub.add_parser("learn", help="运行学习反馈管线(P0 仅 market_state;后续阶段追加)")
+    p.add_argument("--date", help="指定日期(默认今日),格式 YYYY-MM-DD")
+    p.add_argument("--dry-run", action="store_true", help="只打印不执行")
+    p.add_argument("--check", action="store_true", help="仅校验学习产物文件的 JSON 合法性")
+
     args = parser.parse_args()
     if not args.command:
         parser.print_help()
@@ -221,6 +263,7 @@ def main():
         "predict": cmd_predict,
         "scan": cmd_scan,
         "report": cmd_report,
+        "learn": cmd_learn,
     }
     dispatch[args.command](args, config)
 
