@@ -3,7 +3,8 @@
 __pycache__/
 
 # Project runtime artifacts
-data/cache/
+data/cache/*
+!data/cache/alt/
 models/saved/
 reports/output/
 
@@ -20,3 +21,11 @@ logs/
 # Noise files (accidentally created by shell)
 Look
 Set
+
+# Learning system runtime artifacts (P0+)
+learning/feedback/
+learning/history/
+learning/alerts.jsonl
+learning/replay/
+data/cache/alt/*
+!data/cache/alt/.gitkeep
