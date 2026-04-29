@@ -177,7 +177,8 @@ def update_state(hs300_df: pd.DataFrame, date_str: str) -> dict:
         date_str=date_str,
     )
 
-    history = (data.get("history") or []) + [{"date": date_str, "state": new_current}]
+    history = [h for h in (data.get("history") or []) if h.get("date") != date_str]
+    history.append({"date": date_str, "state": new_current})
     history = history[-90:]
 
     hs300_metrics = {
@@ -202,15 +203,18 @@ def update_state(hs300_df: pd.DataFrame, date_str: str) -> dict:
     return new_data
 
 
+def _fetch_hs300(days: int = 120) -> pd.DataFrame:
+    """拉沪深 300 指数日线(akshare 新浪指数接口),返回尾部 days 根 K 线。"""
+    import akshare as ak
+    df = ak.stock_zh_index_daily(symbol="sh000300")
+    if df is None or df.empty:
+        return df
+    return df.tail(days).reset_index(drop=True)
+
+
 def run(date_str: str | None = None) -> dict:
     """编排器入口:拉沪深 300 数据并更新状态。失败抛异常,由编排器捕获。"""
-    from data.fetcher import fetch_stock_hist
-    try:
-        df = fetch_stock_hist("sh000300", days=120)
-    except Exception as exc:
-        logger.warning("sh000300 fetch failed (%s); retrying with 000300", exc)
-        df = fetch_stock_hist("000300", days=120)
-
+    df = _fetch_hs300(days=120)
     if df is None or df.empty:
         raise RuntimeError("无法获取沪深300数据")
 

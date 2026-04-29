@@ -137,8 +137,14 @@ def run():
         ok_cnt  = sum(1 for r in results.values() if r["status"] == "ok")
         failed  = sum(1 for r in results.values() if r["status"] == "failed")
         print(f"[review] 学习管线完成: ok={ok_cnt} failed={failed}")
+        if failed:
+            from learning.alerts import send_alert
+            failed_modules = [n for n, r in results.items() if r["status"] == "failed"]
+            detail = "; ".join(f"{n}: {results[n].get('error','?')}" for n in failed_modules)
+            send_alert("orchestrator", f"{failed} 个学习模块失败: {detail}")
     except Exception as e:
-        print(f"[review] 学习管线异常(忽略,不影响其他): {e}")
+        from learning.alerts import send_alert
+        send_alert("orchestrator", f"学习管线整体异常: {e}", traceback=True)
 
     # ── 5 日指标回填(对 7 日前的 outcome) ─────────────────
     try:
