@@ -49,6 +49,7 @@ _ALL_HEAVY = frozenset({
     "历史", "历史回测", "backtest", "bt",
     "新闻", "消息", "资讯", "news", "n",
     "发送", "推送", "广播", "push", "broadcast",
+    "学习", "自学习", "learn", "l",
 })
 
 BASE = "https://open.feishu.cn/open-apis"

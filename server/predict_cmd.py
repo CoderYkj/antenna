@@ -2292,3 +2292,113 @@ def cmd_trend(code: str) -> dict:
     }
     return {"msg_type": "interactive", "content": json.dumps(card, ensure_ascii=False)}
 
+
+# ── 学习指令 ─────────────────────────────────────────────────
+
+# 顶层 import,便于单测 patch("server.predict_cmd.run_all") 和 push
+from learning.orchestrator import run_all
+from server.feishu_push import push
+
+_STATUS_ICON = {
+    "ok":      "✅",
+    "failed":  "❌",
+    "skipped": "⏭",
+    "dry_run": "📝",
+}
+
+
+def _run_learn_async(*, date_str: str | None, dry_run: bool, mode_text: str,
+                     date_display: str, chat_id: str) -> None:
+    """后台执行 orchestrator 并推回源 chat。
+
+    参数全部 keyword-only:
+      date_str     - 传给 run_all 的日期(None → 今日)
+      dry_run      - 演练模式
+      mode_text    - "真实执行" / "演练"(展示用)
+      date_display - 展示用日期(date_str 为 None 时补今日)
+      chat_id      - 来源会话,空字符串不推送(防误群发)
+    """
+    import time
+    t0 = time.time()
+    try:
+        results = run_all(date_str=date_str, dry_run=dry_run)
+        elapsed = time.time() - t0
+
+        counts = {"ok": 0, "failed": 0, "skipped": 0, "dry_run": 0}
+        lines: list[str] = []
+        for name, r in results.items():
+            status = r.get("status", "?")
+            counts[status] = counts.get(status, 0) + 1
+            icon = _STATUS_ICON.get(status, "•")
+            if status == "failed":
+                lines.append(f"  {icon} {name}: {r.get('error', '?')}")
+            elif status == "skipped":
+                lines.append(f"  {icon} {name}: {r.get('reason', '?')}")
+            else:
+                lines.append(f"  {icon} {name}")
+
+        header_icon = "⚠️" if counts["failed"] > 0 else "✅"
+        msg = (
+            f"{header_icon} 学习{mode_text}完成 · {date_display}\n"
+            f"ok={counts['ok']} failed={counts['failed']} "
+            f"skipped={counts['skipped']} 耗时 {elapsed:.1f}s"
+        )
+        if lines:
+            msg += "\n" + "\n".join(lines)
+
+        if chat_id:
+            push(msg, chat_ids=[chat_id])
+
+    except Exception as e:
+        msg = f"❌ 学习异常 · {date_display}\n{type(e).__name__}: {e}"
+        if chat_id:
+            push(msg, chat_ids=[chat_id])
+
+
+def cmd_learn(arg: str | None, chat_id: str = "") -> str:
+    """飞书"学习"指令:解析参数 → 立即返回开始消息 → 后台跑 orchestrator。
+
+    用法:
+      学习                    - 跑今日(真实)
+      学习 dry-run / 演练      - 演练不产生副作用
+      学习 YYYY-MM-DD         - 指定日期
+    """
+    from datetime import datetime
+
+    dry_run  = False
+    date_str = None
+
+    if arg:
+        a = arg.strip().lower()
+        if a in ("dry-run", "dryrun", "演练", "--dry-run"):
+            dry_run = True
+        else:
+            try:
+                datetime.strptime(arg.strip(), "%Y-%m-%d")
+                date_str = arg.strip()
+            except ValueError:
+                return (
+                    f"用法:`学习`(今日)/ `学习 dry-run`(演练)/ "
+                    f"`学习 YYYY-MM-DD`(指定日期)\n你传的 '{arg}' 无法解析。"
+                )
+
+    date_display = date_str or datetime.now().strftime("%Y-%m-%d")
+    mode_text    = "演练" if dry_run else "真实执行"
+
+    threading.Thread(
+        target=_run_learn_async,
+        kwargs={
+            "date_str":     date_str,
+            "dry_run":      dry_run,
+            "mode_text":    mode_text,
+            "date_display": date_display,
+            "chat_id":      chat_id,
+        },
+        daemon=True,
+    ).start()
+
+    return (
+        f"🤖 开始学习 · {date_display} · 模式: {mode_text}\n"
+        f"后台运行中,完成后会主动推送结果。"
+    )
+
