@@ -398,6 +398,69 @@ No.1 名称（代码）　方向　综合评分 9.5
 
 ---
 
+## 学习系统（Learning）
+
+系统分阶段升级"自主学习"能力，每日由飞书「学习」指令或编排器定时驱动。
+
+### P0 — 地基层（✅ 已上线）
+
+- `learning/market_state.py`：大盘状态打标（bull/bear/range），3 日防抖
+- `learning/tracker.py`：pred/outcome JSONL 归档，含 scene 场景标签
+- `learning/outcome_metrics.py`：`hit_tier`（miss/weak/good/great）与 5 日指标
+- `learning/orchestrator.py`：瘦编排器，模块失败隔离，dry-run 支持
+- `learning/optimizer.py`：精准率监控 + `buy_top_pct` 日级自动调参
+- `learning/feedback_io.py`：原子写 + 7 份历史快照
+
+### P1 — 模型层（✅ 已上线）
+
+目标：从"纯分位切信号"升级为"概率校准 + 错样本加权重训 + 绝对阈值 gate"。
+
+| 组件 | 职责 |
+|------|------|
+| `learning/model_learner.py` | isotonic 概率校准（按 market_state 分 3 桶）+ abs_threshold 月度自校 |
+| `learning/model_learner.yaml` | 可配置参数：sample_weights / calibration / absolute_threshold |
+| `models/predictor.assign_global_signals()` | 双门槛：`rank_pct < buy_top_pct AND prob_cal >= abs_threshold` |
+| `scripts/backfill_hit_tier.py` | 历史 outcome 批量回填 hit_tier（幂等） |
+| `scripts/backfill_market_state.py` | 沪深 300 历史回放，重塑 200+ 天状态序列 |
+| `scripts/replay_learn.py --with-p1` | 198 天验收：baseline vs P1 精准率与 Brier 对比 |
+
+**P1 投产流程**：
+
+```bash
+# 1. 一次性回填（幂等,可重复运行）
+python scripts/backfill_hit_tier.py
+python scripts/backfill_market_state.py
+
+# 2. 首次触发(学习指令 or CLI)
+python cli.py learn          # → 生成 learning/model_learner.json
+python cli.py learn --check  # → 验证所有学习产物 JSON 合法
+
+# 3. 加权重训(可选;默认日级不触发,由 Antenna-WeeklyTrain 周日 20:00 运行)
+python cli.py train --weighted
+
+# 4. 回放验收
+python scripts/replay_learn.py --with-p1 --abs-threshold 0.30
+```
+
+**P1 实测验收**（2025-07-04 ~ 2026-05-08 共 205 天回放，`abs_threshold=0.30`）：
+
+| 指标 | 基线 | P1 | Δ | 硬指标 |
+|------|------|------|-----|--------|
+| 买入精准率 | 21.95% | 30.48% | **+8.52pt** | ≥ +2pt ✅ |
+| Mean Brier | 0.248 | 0.173 | ratio 0.697 | ≤ 0.95 ✅ |
+| Calibrator 拟合率 | — | 98% (200/205 天) | — | — |
+
+> 绝对精准率 30.48% 未达 spec 原设 35% 硬指标——因实际 baseline 22% 而非假设的 33%（当前模型在此数据期偏弱），isotonic 输出上限就是历史实际命中率 36.2%。P1 的核心价值是**把用户看到的概率校准到真实命中率**，避免"模型说 70% 实际只中 30%"的过度乐观。
+
+### P2/P3/P4 — 路线图（⏳ 未启动）
+
+- P2 战法层：`tactic_learner`（阈值/权重自适应）+ AI 深度理由
+- P3 特征层：`alt_data` 资金面/情绪面 + `feature_learner`（指标贡献度）
+- P4 价位层：`price_learner`（ATR/振幅系数网格搜索）
+- 横向：连错股票黑名单，推荐路径过滤
+
+---
+
 ## AI 闲聊
 
 飞书群中无法识别的消息会转交给内置 AI 处理。

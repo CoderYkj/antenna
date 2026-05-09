@@ -1,0 +1,46 @@
+{
+  "abs_threshold": 0.34,
+  "last_calibrated": "2026-05-09T15:13:03",
+  "last_retrained": null,
+  "model_file": "models\\saved\\model_20260508.pkl",
+  "model_sha": "3d811694316d",
+  "calibrators": {
+    "bull": {
+      "samples": 568,
+      "brier_before": 0.2184,
+      "brier_after": 0.1892,
+      "status": "ok",
+      "used_fallback_global": true
+    },
+    "bear": {
+      "samples": 568,
+      "brier_before": 0.2184,
+      "brier_after": 0.1892,
+      "status": "ok",
+      "used_fallback_global": true
+    },
+    "range": {
+      "samples": 568,
+      "brier_before": 0.2184,
+      "brier_after": 0.1892,
+      "status": "ok",
+      "used_fallback_global": false
+    }
+  },
+  "threshold_history": [
+    {
+      "date": "2026-05-08",
+      "acc_30d": 0.2012,
+      "buy_signals": 169,
+      "abs_threshold": 0.32,
+      "change": "0.30 → 0.32: acc_30d 0.201 < 35%, 收严"
+    },
+    {
+      "date": "2026-04-27",
+      "acc_30d": 0.1842,
+      "buy_signals": 190,
+      "abs_threshold": 0.34,
+      "change": "0.32 → 0.34: acc_30d 0.184 < 35%, 收严"
+    }
+  ]
+}

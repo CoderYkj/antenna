@@ -15,7 +15,7 @@ if (-not (Test-Path $LOG_DIR)) {
 
 Write-Host "=== Antenna Task Setup ===" -ForegroundColor Cyan
 
-$taskNames = @("Antenna-Train","Antenna-Scan","Antenna-Predict-AM","Antenna-Predict-PM","Antenna-Noon-Review","Antenna-Daily-Review")
+$taskNames = @("Antenna-Train","Antenna-Scan","Antenna-Predict-AM","Antenna-Predict-PM","Antenna-Noon-Review","Antenna-Daily-Review","Antenna-WeeklyTrain")
 foreach ($tn in $taskNames) {
     schtasks /delete /tn $tn /f 2>$null | Out-Null
 }
@@ -60,6 +60,8 @@ Reg "Antenna-Predict-AM"   (New-BatAction "$ROOT\scripts\run_predict.bat")      
 Reg "Antenna-Predict-PM"   (New-BatAction "$ROOT\scripts\run_predict.bat")      (New-WeekdayRepeat "13:00" 135)
 Reg "Antenna-Noon-Review"  (New-BatAction "$ROOT\scripts\run_noon_review.bat")  (New-Weekday "11:32")
 Reg "Antenna-Daily-Review" (New-BatAction "$ROOT\scripts\run_daily_review.bat") (New-Weekday "15:32")
+# P1 加权重训:每周日 20:00 执行(盘后且用户无感,失败不影响日级链路)
+Reg "Antenna-WeeklyTrain"  (New-BatAction "$ROOT\scripts\run_train_weekly.bat") (New-ScheduledTaskTrigger -Weekly -WeeksInterval 1 -DaysOfWeek Sunday -At "20:00")
 
 Write-Host ""
 Write-Host "=== Verify ===" -ForegroundColor Cyan

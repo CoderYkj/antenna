@@ -12,6 +12,10 @@ reports/output/
 logs/
 *.log
 
+# Coverage
+.coverage
+htmlcov/
+
 # Claude Code internal
 .claude/
 
@@ -27,5 +31,6 @@ learning/feedback/
 learning/history/
 learning/alerts.jsonl
 learning/replay/
+learning/*.json.bak
 data/cache/alt/*
 !data/cache/alt/.gitkeep
