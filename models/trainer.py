@@ -53,6 +53,56 @@ def train(
     return model
 
 
+def train_weighted(
+    df: pd.DataFrame,
+    feature_cols: list,
+    weight_col: str = "sample_weight",
+) -> lgb.Booster:
+    """带 sample_weight 的 LightGBM 训练(P1 §4.4)。
+
+    df 须含 'label' 列与 weight_col 列(默认 'sample_weight')。
+    其他逻辑(walk-forward 划分 / 早停 / AUC 报告)与 train 一致。
+
+    sample_weight 由调用方(model_learner.retrain_with_weights)按 spec §4.1 表
+    根据历史 (signal, hit_tier) 查表预填,本函数不做权重计算,只透传给 LightGBM。
+    """
+    df = df.dropna(subset=feature_cols + ["label", weight_col])
+
+    split_date = df["date"].max() - pd.DateOffset(months=3)
+    train_df = df[df["date"] <= split_date]
+    test_df = df[df["date"] > split_date]
+
+    X_train, y_train = train_df[feature_cols], train_df["label"]
+    w_train = train_df[weight_col].astype(float)
+    X_test, y_test = test_df[feature_cols], test_df["label"]
+    w_test = test_df[weight_col].astype(float)
+
+    train_data = lgb.Dataset(X_train, label=y_train, weight=w_train)
+    valid_data = lgb.Dataset(X_test, label=y_test, weight=w_test, reference=train_data)
+
+    params = {
+        "objective": "binary",
+        "metric": "auc",
+        "learning_rate": 0.05,
+        "num_leaves": 31,
+        "verbose": -1,
+    }
+
+    model = lgb.train(
+        params,
+        train_data,
+        num_boost_round=200,
+        valid_sets=[valid_data],
+        callbacks=[lgb.early_stopping(30, verbose=False), lgb.log_evaluation(50)],
+    )
+
+    if not test_df.empty and y_test.nunique() > 1:
+        auc = roc_auc_score(y_test, model.predict(X_test))
+        print(f"  Test AUC (weighted): {auc:.4f}")
+
+    return model
+
+
 def save_model(model: lgb.Booster, saved_dir: str = "models/saved") -> str:
     Path(saved_dir).mkdir(parents=True, exist_ok=True)
     date_str = datetime.now().strftime("%Y%m%d")

@@ -100,7 +100,12 @@ def cmd_train(args, config):
     combined = pd.concat(dfs, ignore_index=True)
     print(f"  共加载 {len(dfs)} 只股票，跳过 {fail} 只，合计 {len(combined)} 行。")
     print(f"  Training on {len(combined)} rows ...")
-    model = train(combined, feature_cols=FEATURE_COLS)
+    if getattr(args, "weighted", False):
+        from learning.model_learner import retrain_with_weights
+        print("  使用加权重训(P1):按历史 (signal, hit_tier) 查表加权")
+        model = retrain_with_weights(combined, feature_cols=FEATURE_COLS)
+    else:
+        model = train(combined, feature_cols=FEATURE_COLS)
     save_model(model, saved_dir=config["model"]["saved_dir"])
 
 
@@ -590,7 +595,10 @@ def main():
     p.add_argument("--days", type=int, help="历史天数（默认读取 config.yaml）")
     p.add_argument("--workers", type=int, default=8, help="并行线程数（默认 8）")
 
-    sub.add_parser("train", help="训练预测模型")
+    p = sub.add_parser("train", help="训练预测模型")
+    p.add_argument("--weighted", action="store_true",
+                   help="P1 加权重训:按 (signal, hit_tier) 历史给样本加权(buy_miss=2.0 等)")
+    p.add_argument("--workers", type=int, default=8, help="并行加载线程数(默认 8)")
 
     p = sub.add_parser("predict", help="预测单只股票并生成 HTML 报告")
     p.add_argument("code", help="股票代码，如 600519")
