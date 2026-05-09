@@ -1,0 +1,28 @@
+# model_learner.yaml — P1 模型层可调参数
+# 所有数值不进代码常量;调参不改代码,改本文件即可。
+# 加载方式:learning.model_learner.load_config()
+
+# ── 错样本加权重训:sample_weight 查表 ─────────────────────
+# 训练样本 (date, code) 通过历史 pred/outcome 查 (signal, hit_tier) 后定权
+sample_weights:
+  buy_miss:   2.0    # 买入信号 + miss(<1%) → 重点惩罚"高估"错样本
+  buy_weak:   1.2    # 买入信号 + weak(1~2%) → 略偏低,轻微惩罚
+  buy_good:   1.0    # 买入信号 + good(2~5%) → 基线
+  buy_great:  1.5    # 买入信号 + great(>=5%) → 强化"低估正确"样本
+  non_buy:    0.8    # 观望/回避(任何 hit_tier) → 降权
+  default:    1.0    # 无对应 pred 记录 → 历史默认
+
+# ── isotonic 校准器:每市场状态分桶 ─────────────────────
+calibration:
+  lookback_days:          90      # 回溯 N 日 pred×outcome 作为校准样本
+  min_samples_per_bucket: 50      # 单桶最低样本数,不足时回退
+  cold_start_fallback:    global  # 单桶不足 → "global" 用全部样本拟合;"identity" 输出恒等
+
+# ── 绝对概率门槛:月度自校 ─────────────────────────────
+absolute_threshold:
+  initial:         0.30   # 首次启动默认值(对齐当前 isotonic 实测输出上限 0.362 附近;min 边界)
+  min:             0.30   # 下限夹逼
+  max:             0.60   # 上限夹逼
+  step:            0.02   # 单次调整步长
+  lookback_days:   30     # 评估精准率窗口
+  min_buy_signals: 10     # 买入样本不足时维持不调

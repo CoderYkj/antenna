@@ -21,6 +21,7 @@ logger = logging.getLogger(__name__)
 STATE_FILE = Path("learning/market_state.json")
 DEBOUNCE_DAYS = 3  # 连续 N 日触发才切换
 DEFAULT_STATE = "range"
+HISTORY_CAP = 365  # P1 起 history 容量上限:覆盖一年回放窗口(Sprint D replay)
 
 
 def _atomic_write(path: Path, data: dict) -> None:
@@ -179,7 +180,7 @@ def update_state(hs300_df: pd.DataFrame, date_str: str) -> dict:
 
     history = [h for h in (data.get("history") or []) if h.get("date") != date_str]
     history.append({"date": date_str, "state": new_current})
-    history = history[-90:]
+    history = history[-HISTORY_CAP:]
 
     hs300_metrics = {
         "close":   raw.get("close"),
