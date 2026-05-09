@@ -18,7 +18,10 @@ schema(pred 每条):
   "code":      str,
   "name":      str,
   "signal":    "买入" | "观望" | "回避",
-  "rise_prob": float,
+  "rise_prob": float,                     # P1 起语义=rise_prob_cal(已校准)
+  "rise_prob_raw":  float,                # P1 新增:模型原始输出
+  "rise_prob_cal":  float,                # P1 新增:校准后(与 rise_prob 冗余便于归因)
+  "abs_threshold_snapshot": float,        # P1 新增:当次推理时的 abs_threshold
   "confidence":str,
   "rank_pct":  float,                     # 可选
   "market_state": str,                    # 可选,由 market_state 模块写入
