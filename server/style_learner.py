@@ -42,6 +42,10 @@ def _load_cfg() -> dict:
 
 
 def _get_token(cfg: dict) -> str:
+    if "feishu" not in cfg:
+        raise RuntimeError(
+            "config.yaml 缺 'feishu' 配置块。请参考 config.example.yaml 复制并填入凭据。"
+        )
     fc = cfg["feishu"]
     resp = requests.post(
         f"{BASE}/auth/v3/tenant_access_token/internal",

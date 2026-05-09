@@ -1,0 +1,73 @@
+# ────────────────────────────────────────────────────────────────────
+# Antenna 配置模板 — 复制为 config.yaml 后填入真实凭据
+#
+#   cp config.example.yaml config.yaml
+#
+# config.yaml 已列入 .gitignore,真实凭据不会被跟踪。
+# ────────────────────────────────────────────────────────────────────
+
+data:
+  source:       akshare
+  cache_dir:    data/cache
+  default_days: 365
+
+universe:
+  # 自选股代码(字符串,保留前导零):
+  watchlist:
+    - "600519"   # 贵州茅台
+    - "000858"   # 五粮液
+    - "601318"   # 中国平安
+    - "000001"   # 平安银行
+    - "600036"   # 招商银行
+  # watchlist = 仅自选 / all = 全 A 股(需先跑 fetch --all)
+  scan_pool: all
+
+model:
+  target_days:  5       # 预测未来 N 日涨跌
+  threshold:    0.02    # 涨跌幅判定阈值(2%)
+  train_years:  3       # 训练数据年限
+  test_months:  3       # 回测窗口月数
+  saved_dir:    models/saved
+
+reports:
+  output_dir:   reports/output
+
+# ── 飞书集成 ────────────────────────────────────────────────
+feishu:
+  # 单向 Webhook(自定义机器人,可选;为空则跳过定时推送)
+  webhook_url:  ""
+  scan_top:     20                    # 扫描结果推送 Top N
+
+  # 双向交互机器人(自建应用,必填以启用 feishu_poll.py)
+  app_id:       ""                    # cli_xxxxxxxxxxxxxx
+  app_secret:   ""                    # 32 位长字符串
+  chat_ids:                           # 机器人监控的会话(oc_ 为群聊)
+    - ""                              # 例: oc_xxxxxxxxxxxxxxx
+
+# ── AI 闲聊(两个 key 至少填一个) ─────────────────────────
+anthropic:
+  api_key:      ""                    # Anthropic API Key (sk-ant-xxx)
+  model:        claude-haiku-4-5-20251001
+
+deepseek:
+  api_key:      ""
+  model:        deepseek-chat
+
+qwen:
+  api_key:      ""                    # 阿里云 DashScope (sk-xxx)
+  model:        qwen3-8b              # qwen3-8b / qwen3-14b / qwen3-235b-a22b
+
+# ── 风格采集(可选;style 子命令用) ────────────────────────
+colleague:
+  p2p_chat_id:  ""                    # 与目标同事的 P2P 会话 ID
+  open_id:      ""                    # 或用 open_id 替代 p2p_chat_id
+  fetch_days:   60
+  min_messages: 30
+
+# ── PM2 监控面板 ──────────────────────────────────────────
+pm2_monitor:
+  host:         127.0.0.1
+  port:         9615
+  username:     admin
+  password:     "CHANGE_ME"           # 建议改成强密码
+  log_lines:    200

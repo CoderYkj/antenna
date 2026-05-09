@@ -29,7 +29,12 @@ def _get_token() -> str:
     with _token_lock:
         if time.time() < _token_exp:
             return _token
-        cfg  = _load_cfg()["feishu"]
+        full_cfg = _load_cfg()
+        if "feishu" not in full_cfg:
+            raise RuntimeError(
+                "config.yaml 缺 'feishu' 配置块。请参考 config.example.yaml 复制并填入凭据。"
+            )
+        cfg = full_cfg["feishu"]
         resp = requests.post(
             f"{BASE}/auth/v3/tenant_access_token/internal",
             json={"app_id": cfg["app_id"], "app_secret": cfg["app_secret"]},

@@ -62,7 +62,13 @@ def _load_cfg():
 
 class FeishuPoller:
     def __init__(self):
-        cfg = _load_cfg()["feishu"]
+        full_cfg = _load_cfg()
+        if "feishu" not in full_cfg:
+            raise RuntimeError(
+                "config.yaml 缺 'feishu' 配置块。请参考 config.example.yaml 复制并填入凭据 "
+                "(app_id / app_secret / chat_ids),详见 README §配置文件。"
+            )
+        cfg = full_cfg["feishu"]
         self.app_id     = cfg["app_id"]
         self.app_secret = cfg["app_secret"]
         self._cfg_chat_ids = cfg.get("chat_ids", [])   # 启动时读一次，后续直接复用
