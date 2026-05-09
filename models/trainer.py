@@ -7,50 +7,79 @@ import pandas as pd
 from sklearn.metrics import roc_auc_score
 
 
+# ── LightGBM 参数(集中管理,原 train/train_weighted 内联常量) ──
+_LGB_PARAMS = {
+    "objective":     "binary",
+    "metric":        "auc",
+    "learning_rate": 0.05,
+    "num_leaves":    31,
+    "verbose":       -1,
+}
+_NUM_BOOST_ROUND   = 200
+_EARLY_STOP_ROUNDS = 30
+_LOG_EVERY_ROUNDS  = 50
+
+
 def build_labels(df: pd.DataFrame, target_days: int = 5, threshold: float = 0.02) -> pd.Series:
     """计算未来 N 天涨幅是否超过阈值（1=涨，0=不涨）。"""
     future_return = df["close"].shift(-target_days) / df["close"] - 1
     return (future_return > threshold).astype(int)
 
 
-def train(
+def _train_impl(
     df: pd.DataFrame,
     feature_cols: list,
+    weight_col: str | None = None,
 ) -> lgb.Booster:
-    """训练 LightGBM 二分类模型。df 须已含 'label' 列（由调用方按股票单独计算）。"""
-    df = df.dropna(subset=feature_cols + ["label"])
+    """train / train_weighted 的共享实现。
+
+    weight_col=None:普通训练;否则从 df 取 weight 列透传给 lgb.Dataset(weight=)。
+    划分/早停/AUC 报告统一。
+    """
+    required = feature_cols + ["label"]
+    if weight_col is not None:
+        required = required + [weight_col]
+    df = df.dropna(subset=required)
 
     split_date = df["date"].max() - pd.DateOffset(months=3)
     train_df = df[df["date"] <= split_date]
-    test_df = df[df["date"] > split_date]
+    test_df  = df[df["date"] >  split_date]
 
     X_train, y_train = train_df[feature_cols], train_df["label"]
-    X_test, y_test = test_df[feature_cols], test_df["label"]
+    X_test,  y_test  = test_df[feature_cols],  test_df["label"]
 
-    train_data = lgb.Dataset(X_train, label=y_train)
-    valid_data = lgb.Dataset(X_test, label=y_test, reference=train_data)
-
-    params = {
-        "objective": "binary",
-        "metric": "auc",
-        "learning_rate": 0.05,
-        "num_leaves": 31,
-        "verbose": -1,
-    }
+    if weight_col is not None:
+        w_train = train_df[weight_col].astype(float)
+        w_test  = test_df[weight_col].astype(float)
+        train_data = lgb.Dataset(X_train, label=y_train, weight=w_train)
+        valid_data = lgb.Dataset(X_test,  label=y_test,  weight=w_test, reference=train_data)
+        auc_label  = "Test AUC (weighted)"
+    else:
+        train_data = lgb.Dataset(X_train, label=y_train)
+        valid_data = lgb.Dataset(X_test,  label=y_test,  reference=train_data)
+        auc_label  = "Test AUC"
 
     model = lgb.train(
-        params,
+        _LGB_PARAMS,
         train_data,
-        num_boost_round=200,
+        num_boost_round=_NUM_BOOST_ROUND,
         valid_sets=[valid_data],
-        callbacks=[lgb.early_stopping(30, verbose=False), lgb.log_evaluation(50)],
+        callbacks=[
+            lgb.early_stopping(_EARLY_STOP_ROUNDS, verbose=False),
+            lgb.log_evaluation(_LOG_EVERY_ROUNDS),
+        ],
     )
 
     if not test_df.empty and y_test.nunique() > 1:
         auc = roc_auc_score(y_test, model.predict(X_test))
-        print(f"  Test AUC: {auc:.4f}")
+        print(f"  {auc_label}: {auc:.4f}")
 
     return model
+
+
+def train(df: pd.DataFrame, feature_cols: list) -> lgb.Booster:
+    """训练 LightGBM 二分类模型。df 须已含 'label' 列(由调用方按股票单独计算)。"""
+    return _train_impl(df, feature_cols, weight_col=None)
 
 
 def train_weighted(
@@ -66,41 +95,7 @@ def train_weighted(
     sample_weight 由调用方(model_learner.retrain_with_weights)按 spec §4.1 表
     根据历史 (signal, hit_tier) 查表预填,本函数不做权重计算,只透传给 LightGBM。
     """
-    df = df.dropna(subset=feature_cols + ["label", weight_col])
-
-    split_date = df["date"].max() - pd.DateOffset(months=3)
-    train_df = df[df["date"] <= split_date]
-    test_df = df[df["date"] > split_date]
-
-    X_train, y_train = train_df[feature_cols], train_df["label"]
-    w_train = train_df[weight_col].astype(float)
-    X_test, y_test = test_df[feature_cols], test_df["label"]
-    w_test = test_df[weight_col].astype(float)
-
-    train_data = lgb.Dataset(X_train, label=y_train, weight=w_train)
-    valid_data = lgb.Dataset(X_test, label=y_test, weight=w_test, reference=train_data)
-
-    params = {
-        "objective": "binary",
-        "metric": "auc",
-        "learning_rate": 0.05,
-        "num_leaves": 31,
-        "verbose": -1,
-    }
-
-    model = lgb.train(
-        params,
-        train_data,
-        num_boost_round=200,
-        valid_sets=[valid_data],
-        callbacks=[lgb.early_stopping(30, verbose=False), lgb.log_evaluation(50)],
-    )
-
-    if not test_df.empty and y_test.nunique() > 1:
-        auc = roc_auc_score(y_test, model.predict(X_test))
-        print(f"  Test AUC (weighted): {auc:.4f}")
-
-    return model
+    return _train_impl(df, feature_cols, weight_col=weight_col)
 
 
 def save_model(model: lgb.Booster, saved_dir: str = "models/saved") -> str:
