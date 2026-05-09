@@ -39,10 +39,12 @@
 |-------|------|------|
 | 交付范围 | **完整 P2** = tactic_learner + ai_reason | 两者强耦合(共振权重影响 prompt 顺序);分两次做 spec 信息冗余 |
 | 阈值调整算法 | **固定步长 ±1**(±2 触底回弹) | 对齐 P1 abs_threshold 风格,保守稳定;贝叶斯优化数据量不足 |
-| 战法权重 | **共振 rise_prob 加权** | spec §6.2 既定;权重 = 近 90 日精准率归一化 |
+| 战法共振机制(**D3**) | **共振调 rank_pct,不动 rise_prob/prob_cal** | 直接 boost rise_prob_raw 会污染 calibrator 学到的 prob_cal 真实命中率;改为调整全市场排名,既保留共振价值又不破坏 P1 设计哲学(详见 §3.3) |
 | 触发频率 | **跟 model_learner 同步**(每次"学习"指令 + 每周日 15:30 兜底) | 与 P1 节拍一致;避免单独定时任务 |
 | 代码落位 | **`learning/tactic_learner.py` + `tactic_learner.yaml`** | 与 P1 风格统一;参数全部走配置 |
-| 冷启动 | 单战法样本 < 30 → **维持上版阈值**(不调整,不报错) | 比硬编码默认更保守(P1 经验:盲目重置反而弱化) |
+| 冷启动(单桶) | 单战法样本 < 30 → **维持上版阈值**(不调整,不报错) | 比硬编码默认更保守(P1 经验:盲目重置反而弱化) |
+| bear 桶冷启动(**D4**) | **手工 override defaults_bear**(更严的 ROE/负债约束) | 当前 history bear=0 天,P2 上线后可能数年学不到 bear 阈值,defaults 必须保守(详见 §3.1) |
+| 阈值收严方向(**D5**) | **逐阈值标 direction(`tighten_up`/`tighten_down`)** | 旧版"全部 +step"对 `debt_ratio_max` 等"max 类"阈值方向错误,会越收越宽(详见 §3.2) |
 | ai_reason 落位 | **`server/ai_reason.py`** | server/ 下与 cmd_chat 共用 LLM 路由;不进 learning/(不参与学习闭环) |
 | ai_reason 缓存 | **(code, market_state, prob_cal_bucket=0.05) 24h 复用** | spec §7.4 既定;30 股 × 1K token ≈ 0.15 元/天 |
 
@@ -116,26 +118,47 @@
 
 ### 3.1 阈值参数化
 
-每战法的硬编码门槛全部抽到 `tactic_learner.yaml`:
+每战法的硬编码门槛全部抽到 `tactic_learner.yaml`,**每条阈值附带"收严方向"标记**(D5 决策):
+
+- `direction: tighten_up`   表示"提高数值=更严"(如 ROE 门槛、营收增速门槛),收严 +step、放宽 -step
+- `direction: tighten_down` 表示"降低数值=更严"(如 debt_ratio_max、drawdown_max),收严 -step、放宽 +step
 
 ```yaml
 defaults:           # 冷启动 / 单桶不足时的默认值
   value:
-    roe_min:        8.0
-    debt_ratio_max: 50.0
-    total_score_min: 2.0
+    roe_min:        {value: 8.0,  direction: tighten_up}    # ROE 越低门槛越宽
+    debt_ratio_max: {value: 50.0, direction: tighten_down}  # 负债率越高门槛越宽
+    total_score_min: {value: 2.0, direction: tighten_up}
   growth:
-    rev_growth_min:    15.0
-    profit_growth_min: 15.0
-    roe_min:           12.0
+    rev_growth_min:    {value: 15.0, direction: tighten_up}
+    profit_growth_min: {value: 15.0, direction: tighten_up}
+    roe_min:           {value: 12.0, direction: tighten_up}
   leader:
-    roe_min:        15.0
-    gross_margin_min: 30.0
-    above_ma60_required: true
+    roe_min:        {value: 15.0, direction: tighten_up}
+    gross_margin_min: {value: 30.0, direction: tighten_up}
+    above_ma60_required: true     # 布尔值不参与微调
   contra:
-    drawdown_max: -0.15
-    roe_min:       3.0
-    debt_ratio_max: 65.0
+    drawdown_max: {value: -0.15, direction: tighten_down}   # 越负=要求跌得越深=更严
+    roe_min:       {value: 3.0,  direction: tighten_up}
+    debt_ratio_max: {value: 65.0, direction: tighten_down}
+
+# bear 市场默认值(D4 决策:手工调严,即使桶样本永远不足也有保守兜底)
+defaults_bear_override:
+  value:
+    roe_min:        12.0          # 8 → 12,提高 ROE 门槛
+    debt_ratio_max: 40.0          # 50 → 40,收紧负债
+    total_score_min: 3.0          # 2 → 3
+  growth:
+    rev_growth_min:    20.0       # 15 → 20
+    profit_growth_min: 20.0
+    roe_min:           15.0
+  leader:
+    roe_min:           18.0       # 15 → 18
+    gross_margin_min:  35.0       # 30 → 35
+  contra:
+    drawdown_max: -0.20           # -15% → -20%,bear 中需要更深超跌才入场
+    roe_min:       5.0            # 3 → 5
+    debt_ratio_max: 55.0          # 65 → 55
 
 bounds:             # 调参锁定范围(防"学飞")
   value:
@@ -153,37 +176,47 @@ bounds:             # 调参锁定范围(防"学飞")
     roe_min: [2.0, 8.0]
     debt_ratio_max: [55.0, 75.0]
 
-step:               # 单次调整步长
-  default: 1.0      # 大部分阈值用 ±1
-  drawdown: -0.01   # drawdown 用 ±0.01(数值更小)
+step:               # 单次调整步长(绝对值,符号由 direction 决定)
+  default: 1.0
+  drawdown: 0.01    # drawdown 用 ±0.01
 
 evaluation:
   lookback_days:  90
-  min_samples:    30        # 单 (state, tactic) 桶 <30 维持上版
-  acc_low:        0.30      # < 此值收严
-  acc_high:       0.60      # > 此值放宽
+  min_samples:    30
+  acc_low:        0.30
+  acc_high:       0.60
 
-weights:                    # 战法权重相关
-  enable_resonance_boost: true
-  boost_per_tactic:       0.02   # 每命中一个战法 rise_prob +0.02 上限
-  weight_min:             0.05
-  weight_max:             0.40
+weights:                    # D3 决策:共振时调整 rank_pct,不动 prob_cal
+  enable_resonance_rank_boost: true
+  rank_boost_per_tactic:       0.02   # 命中 N 个战法,rank_pct -= N × 0.02 (向前提名次)
+  rank_boost_max:              0.06   # 最多提 6% 名次(等效 3 战法满共振)
+  weight_min:                  0.05   # 单战法权重下限
+  weight_max:                  0.40   # 单战法权重上限
 ```
 
 ### 3.2 阈值微调规则
 
-按近 90 日精准率(信号 = `signal=买入` 在该战法子场景下),**逐阈值独立调整**:
+按近 90 日精准率(信号 = `signal=买入` 在该战法子场景下),**逐阈值独立调整,符号由 direction 决定**(D5):
 
-| 90 日精准率 | 动作 | 边界处理 |
-|------------|------|---------|
-| < 30%      | 阈值收严 +step | 触上界回退 -2 step(超买信号危险) |
-| 30% ~ 60%  | 维持 | — |
-| > 60%      | 阈值放宽 -step | 触下界回退 +2 step |
-| 样本 <30   | 维持(reason='insufficient_samples') | — |
+| 90 日精准率 | 动作 | 应用公式(按 direction) | 边界处理 |
+|------------|------|----------------------|---------|
+| < 30%      | 收严 | `tighten_up` → +step;`tighten_down` → -step | 触上/下界回退 -2/+2 step |
+| 30% ~ 60%  | 维持 | — | — |
+| > 60%      | 放宽 | `tighten_up` → -step;`tighten_down` → +step | 同上反向 |
+| 样本 <30   | 维持(reason='insufficient_samples') | — | — |
 
-**为什么"逐阈值独立"**:`value` 战法有 3 个阈值(roe_min/debt_ratio_max/total_score_min),不是统一调一个倍数,而是按战法当前精准率统一改方向(收严 → 全部 +step,放宽 → 全部 -step)。每周一次,变化有限。
+**示例**:`value` 战法精准率 27% < 30%,按战法统一收严:
+- `roe_min` (tighten_up):8.0 → +1.0 → **9.0**(更高 ROE = 更严)
+- `debt_ratio_max` (tighten_down):50.0 → -1.0 → **49.0**(更低负债 = 更严)
+- `total_score_min` (tighten_up):2.0 → +1.0 → **3.0**
 
-### 3.3 战法权重学习
+旧版 spec 写"全部 +step"是 bug,会让 `debt_ratio_max` 收严反而变成 51 → 52(允许更高负债,实际放宽)。本版按 direction 标记修正。
+
+### 3.3 战法权重学习(D3:共振调 rank_pct,不污染 prob_cal)
+
+**原始方案的问题**:直接 boost rise_prob_raw 会导致 calibrator 学到的 prob_cal 也被污染——P1 设计哲学要求"prob_cal = 真实命中率",rise_prob_raw 加权后再过 isotonic 输出的 prob_cal 不再是真实命中率,而是混合了战法主观偏好。
+
+**新方案(D3)**:**只调整全市场排名 rank_pct,不动 rise_prob/prob_cal**。共振股向前提名次,但概率字段保持原始值,calibrator 输出的"真实命中率"承诺不变。
 
 ```python
 # 伪代码
@@ -196,21 +229,32 @@ for state in ("bull", "bear", "range"):
             continue
         weights[state][tactic] = compute_acc(bucket)  # [0, 1]
 
-    # 状态内归一化:权重总和 = 1.0,但单战法夹到 [weight_min, weight_max]
+    # 状态内归一化:权重总和 = 1.0,单战法夹到 [weight_min, weight_max]
     state_weights = weights[state]
     total = sum(state_weights.values())
     for t in state_weights:
         state_weights[t] = clip(state_weights[t] / total, weight_min, weight_max)
 ```
 
-**rise_prob 加权**(只在 scan_bot 共振场景):
+**rank_pct 调整**(只在 scan_bot 共振场景):
 ```python
-# cmd_scan_bot._enrich_tactic_scores 内
-hits_count = sum(1 for t in TACTICS if r["tactic_tags"].get(t))
-weighted_boost = sum(weights[state][t] for t in TACTICS if r["tactic_tags"].get(t))
-r["rise_prob"] *= (1.0 + weighted_boost * cfg.weights.boost_per_tactic)
-# 重要:只对 rise_prob_raw 加权;rise_prob_cal 由 calibrator 决定,不再加权
+# cmd_scan_bot._enrich_tactic_scores 内,在 assign_global_signals 之后做
+hits = [t for t in TACTICS if r["tactic_tags"].get(t)]
+if len(hits) >= 2:  # 仅共振股(≥2 命中)享受
+    weighted_boost = sum(weights[state][t] for t in hits)
+    rank_delta = min(
+        weighted_boost * cfg.weights.rank_boost_per_tactic,
+        cfg.weights.rank_boost_max,
+    )
+    r["global_rank_pct"] = max(0.0, r["global_rank_pct"] - rank_delta)
+    # 重要:rise_prob / rise_prob_raw / rise_prob_cal 都不动
+    # signal 由 assign_global_signals 已经基于原始 rank_pct 切过,这里只重排顺序
 ```
+
+**与 P1 双门槛的关系**:
+- P1 双门槛:`rank_pct < buy_top_pct AND prob_cal >= abs_threshold` 决定 signal
+- P2 共振 boost:仅在 signal 已确定后,**调整候选股的展示顺序**,让"质优共振股"排在"单一战法或纯技术驱动"之上
+- 不会让原本不达标的股票"变出"买入信号(P1 prob_cal 门槛仍是硬约束)
 
 ### 3.4 产物 `learning/tactic_params.json`
 

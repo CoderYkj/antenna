@@ -5,6 +5,12 @@
 **Owner:** 意吟
 **Base branch:** master
 
+> ⚠️ **2026-05-09 更新提示**:本文档为学习系统总体路线图。**部分章节已被后续详细 spec 覆盖**,请优先参考:
+> - **§6.1 P1 model_learner**:已被 [P1 详细 spec](2026-04-29-antenna-learning-p1-model-layer-design.md) 完整覆盖,且 P1 已 100% 实施(见该 spec 附录 D 实施备忘)
+> - **§6.2 P2 tactic_learner + §7.4 ai_reason**:已被 [P2 详细 spec](2026-05-09-antenna-learning-p2-tactic-layer-design.md) 完整覆盖,触发频率从"每周三/周日"调整为"跟 model_learner 同步"
+> - **§6.3 P3 / §6.4 P4 / §7.2 黑名单 / §7.3 alt_data**:仍为路线图大纲,启动前需要补详细 spec
+> - **§5.4 market_state**:已实施(P0 阶段完成)
+
 ---
 
 ## 1. 目标与非目标

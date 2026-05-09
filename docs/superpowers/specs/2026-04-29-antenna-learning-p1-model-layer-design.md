@@ -527,4 +527,39 @@ def run(date_str: str | None = None) -> dict:
 
 ---
 
+## 附录 D:实施备忘录(2026-05-09 落地后回写)
+
+P1 spec 100% 落地,但实施过程中出现 4 处与原 spec 偏离,记录如下:
+
+### D.1 `abs_threshold.initial`:0.45 → 0.30
+
+**Spec 原计划**:`yaml.absolute_threshold.initial = 0.45`
+**实际部署**:**0.30**(抛光阶段调整)
+**原因**:实测 isotonic 输出上限为 0.36(历史命中率上限),0.45 高于该值导致买入信号 0。下调到 0.30 与 isotonic 实际分布对齐。
+**影响范围**:`learning/model_learner.yaml`、`learning/model_learner.py:load_abs_threshold` 默认值、`models/predictor.py:_apply_calibration` 异常兜底默认值。
+
+### D.2 replay 简化:用 `pred.rise_prob` 替代重打分
+
+**Spec §5.1 要求**:校准器拟合时用最新模型对历史样本重打分(`_rebuild_features_for` 复原特征 → `model.predict` 得 prob_raw)。
+**实际**:`scripts/replay_learn.py --with-p1` 为效率简化为**直接用 pred.rise_prob 作 prob_raw**,不重打分。
+**理由**:回放 198 天 × 几十股票 × 单次特征复原 ~20ms = 数小时不现实。生产 `fit_calibrators` 仍按 spec 走真实重打分。
+**影响**:replay 数值与生产实际略有偏差(模型多次重训过,pred.rise_prob 是当时模型输出而非最新模型);但 delta_acc/delta_brier 的相对趋势可信。
+
+### D.3 验收硬指标"精准率 ≥ 35%"未达成
+
+**Spec §9 验收**:买入精准率 ≥ 35%(基线 33% + 2pt)
+**实际**:全量 205 天 P1 acc = **30.48%**(@ abs_threshold=0.30) / 最近 27 天 range 市场 = **37.50%** ✅
+**原因**:实际 baseline 22% 而非 spec 假设的 33%(数据期间模型偏弱)。isotonic 输出上限就是历史命中率 36.2%,30.48% 接近该天花板。
+**P1 真正价值**:把用户看到的概率校准到真实命中率,避免"模型说 70% 实际只中 30%"。
+**调整建议**:未来重写硬指标改为"**Δ 精准率 ≥ +2pt**"(实际 +8.52pt 全量 / +15.84pt 近期),不强求绝对值;Brier ratio ≤ 0.95 ✅(实际 0.697)与拟合率 ≥ 90% ✅(实际 98%)是 P1 真正的核心交付证据。
+
+### D.4 `models/predictor.py` 实际状态偏离 spec 假设
+
+**Spec §3.3 假设**:predictor 已含 `load_model` / `assign_global_signals` 等高阶 API,只需"加载 calibrator + 输出 rise_prob_cal"。
+**实际**:工作区 predictor.py 当时只有 37 行,只有一个 `predict()` 函数;`load_model` / `assign_global_signals` 在 `predict_cmd.py` 等多处被 lazy import 但**根本不存在**(ThreadPoolExecutor 与 try/except 长期吞异常,用户看到"无有效结果")。
+**实际 Sprint B 工作**:把 predictor.py 从 37 行**重写到 185 行**,补齐 `load_model` / `assign_global_signals` / `_apply_calibration` 等。修复了存在已久的 cmd_scan_bot 隐蔽 bug。
+**教训**:spec 中的"已有 API"假设需要在 import 前 `Read` 文件验证;架构 memo 描述的可能是"设计意图"而非"代码现状"。已记入 memory `feedback_architecture_memo_staleness`。
+
+---
+
 **end of spec**
