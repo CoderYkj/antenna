@@ -33,7 +33,8 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
     # 均线
     for period in [5, 10, 20, 60]:
-        df[f"ma{period}"] = ta.sma(df["close"], length=period)
+        sma = ta.sma(df["close"], length=period)
+        df[f"ma{period}"] = sma if sma is not None else float("nan")
 
     # 均线偏离度
     for period in [5, 10, 20, 60]:
@@ -97,5 +98,14 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
 
     # 价格衍生
     df["pct_change"] = df["close"].pct_change()
+
+    # 换手率（由 fetcher 从 akshare 传入；若数据来源不含该列则填 NaN，不报错）
+    if "turnover" not in df.columns:
+        df["turnover"] = float("nan")
+
+    # 确保所有特征列为 float，防止 object dtype 导致 LightGBM 报错
+    for col in FEATURE_COLS:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
 
     return df
