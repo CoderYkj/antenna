@@ -771,10 +771,40 @@ def _enrich_tactic_scores(results: list, workers: int = 8) -> list:
     """
     对已筛选结果并行拉取财务数据，输出四维战法标签与共振度。
     不改变入参列表顺序，仅追加字段：tactic_tags / tactic_reasons / tactic_resonance / fin_res。
+
+    P2 改造:阈值从 server/predict_cmd.py 硬编码 → 读 learning/tactic_params.json[当前 state]。
+    文件缺失/损坏自动回退到 yaml.defaults(含 bear override)。
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from data.fetcher import fetch_financial_data
     from features.fundamental import analyse_financials
+
+    # P2:加载当前 market_state 对应的战法阈值
+    try:
+        from learning import market_state, tactic_learner
+        state = market_state.load_current_state().get("current", "range")
+        params = tactic_learner.load_params(state)
+    except Exception:
+        params = {}
+
+    # 各战法参数(回退到原硬编码值,保证 P2 关闭时行为不变)
+    p_value  = params.get("value",  {}) or {}
+    p_growth = params.get("growth", {}) or {}
+    p_leader = params.get("leader", {}) or {}
+    p_contra = params.get("contra", {}) or {}
+
+    v_roe_min        = float(p_value.get("roe_min",         8.0))
+    v_debt_max       = float(p_value.get("debt_ratio_max",  50.0))
+    v_total_min      = float(p_value.get("total_score_min", 2.0))
+    g_rev_min        = float(p_growth.get("rev_growth_min",    15.0))
+    g_pft_min        = float(p_growth.get("profit_growth_min", 15.0))
+    g_roe_min        = float(p_growth.get("roe_min",           12.0))
+    l_roe_min        = float(p_leader.get("roe_min",          15.0))
+    l_gross_min      = float(p_leader.get("gross_margin_min", 30.0))
+    l_above_required = bool(p_leader.get("above_ma60_required", True))
+    c_drawdown_max   = float(p_contra.get("drawdown_max",  -0.15))
+    c_roe_min        = float(p_contra.get("roe_min",        3.0))
+    c_debt_max       = float(p_contra.get("debt_ratio_max", 65.0))
 
     def _score_one(item):
         code = item["code"]
@@ -805,9 +835,9 @@ def _enrich_tactic_scores(results: list, workers: int = 8) -> list:
 
         # ── 价值：低负债 + ROE健康 + 财务总分正向 ──────────────
         v = 0
-        if roe and roe > 8:        v += 1
-        if debt_r and debt_r < 50: v += 1
-        if total_s >= 2:           v += 1
+        if roe and roe > v_roe_min:        v += 1
+        if debt_r and debt_r < v_debt_max: v += 1
+        if total_s >= v_total_min:         v += 1
         if v >= 2:
             tags["价值"] = True
             parts = []
@@ -817,9 +847,9 @@ def _enrich_tactic_scores(results: list, workers: int = 8) -> list:
 
         # ── 成长：营收/利润增速领先 ─────────────────────────────
         g = 0
-        if rev_gr and rev_gr > 15: g += 1
-        if pft_gr and pft_gr > 15: g += 1
-        if roe and roe > 12:       g += 1
+        if rev_gr and rev_gr > g_rev_min: g += 1
+        if pft_gr and pft_gr > g_pft_min: g += 1
+        if roe and roe > g_roe_min:       g += 1
         if g >= 2:
             tags["成长"] = True
             parts = []
@@ -829,9 +859,9 @@ def _enrich_tactic_scores(results: list, workers: int = 8) -> list:
 
         # ── 龙头：高毛利 + ROE优秀 + 技术强势 ─────────────────
         l = 0
-        if roe and roe > 15:         l += 1
-        if gross_m and gross_m > 30: l += 1
-        if above_60:                 l += 1
+        if roe and roe > l_roe_min:           l += 1
+        if gross_m and gross_m > l_gross_min: l += 1
+        if (not l_above_required) or above_60: l += 1
         if l >= 2:
             tags["龙头"] = True
             parts = []
@@ -841,9 +871,9 @@ def _enrich_tactic_scores(results: list, workers: int = 8) -> list:
 
         # ── 逆向：技术超跌 + 基本面仍稳健 ─────────────────────
         c = 0
-        if drawdown < -0.15:           c += 1
-        if roe and roe > 3:            c += 1
-        if debt_r and debt_r < 65:     c += 1
+        if drawdown < c_drawdown_max:    c += 1
+        if roe and roe > c_roe_min:      c += 1
+        if debt_r and debt_r < c_debt_max: c += 1
         if c >= 2:
             tags["逆向"] = True
             reasons["逆向"] = f"距高点 {drawdown*100:.1f}%，基本面支撑"
@@ -867,6 +897,106 @@ def _enrich_tactic_scores(results: list, workers: int = 8) -> list:
 
     # 保持原始顺序，失败项保留原始数据
     return [enriched_map.get(r["code"], r) for r in results]
+
+
+# ── P2 D3:共振股 rank_pct 加权(不动 rise_prob/prob_cal) ──
+
+# 中文战法名 → yaml 英文 key
+_TACTIC_CN_TO_EN = {"价值": "value", "成长": "growth", "龙头": "leader", "逆向": "contra"}
+
+
+def _apply_resonance_boost(results: list) -> list:
+    """spec §3.3 D3:对共振股(≥2 战法命中)向前提名次,不动 rise_prob/prob_cal。
+
+    - 读当前 market_state 对应的战法权重
+    - 命中 N 个战法,rank_pct -= sum(weights[hit]) × rank_boost_per_tactic
+    - 总提升不超过 rank_boost_max(默认 6%)
+    - 全部 rise_prob/rise_prob_raw/rise_prob_cal 字段保持原值
+    - 任何异常 → 无操作返回原列表
+    """
+    if not results:
+        return results
+    try:
+        from learning import market_state, tactic_learner
+        state = market_state.load_current_state().get("current", "range")
+        cfg = tactic_learner.load_config()
+        if not cfg.weights.get("enable_resonance_rank_boost", True):
+            return results
+        weights = tactic_learner.load_resonance_weights(state)
+        boost_per_tactic = float(cfg.weights.get("rank_boost_per_tactic", 0.02))
+        boost_max        = float(cfg.weights.get("rank_boost_max",        0.06))
+    except Exception:
+        return results
+
+    for r in results:
+        tags = r.get("tactic_tags", {}) or {}
+        hits = [t for t in tags if tags.get(t)]
+        if len(hits) < 2:
+            continue
+        weighted = sum(weights.get(_TACTIC_CN_TO_EN.get(t, ""), 0.0) for t in hits)
+        rank_delta = min(weighted * boost_per_tactic, boost_max)
+        if rank_delta <= 0:
+            continue
+        old_rank_pct = float(r.get("global_rank_pct", 1.0))
+        r["global_rank_pct"] = round(max(0.0, old_rank_pct - rank_delta), 4)
+        r["resonance_rank_boost"] = round(rank_delta, 4)
+        # rise_prob / rise_prob_raw / rise_prob_cal 一概不动
+
+    return results
+
+
+# ── P2 ai_reason 集成辅助 ────────────────────────────────
+
+def _build_ai_reason_text(r: dict, news_items: list, total: int, sector: str) -> str:
+    """把 scan_bot 的股票 dict 转 StockContext 并调 ai_reason.generate,
+    返回可嵌入 lines 的 markdown 文本(单行);None/失败返回空字符串不插入。
+
+    feature flag: config.yaml ai_reason.enable (缺省 true)
+    """
+    cfg = _load_cfg()
+    if not (cfg.get("ai_reason") or {}).get("enable", True):
+        return ""
+
+    from server.ai_reason import StockContext, generate, render_card_section
+    from learning import market_state
+    try:
+        state = market_state.load_current_state().get("current", "range")
+    except Exception:
+        state = "range"
+    try:
+        from learning.optimizer import load_strategy
+        acc_30d = load_strategy().get("accuracy_30d")
+    except Exception:
+        acc_30d = None
+
+    tags = r.get("tactic_tags", {}) or {}
+    last = r.get("last", {}) or {}
+    news_summary = " / ".join(
+        (n[0] if isinstance(n, tuple) else str(n)) for n in news_items[:3]
+    )
+
+    ctx = StockContext(
+        code=r.get("code", ""),
+        name=r.get("name", r.get("code", "")),
+        rise_prob_raw=float(r.get("rise_prob_raw", r.get("rise_prob", 0.0))),
+        rise_prob_cal=float(r.get("rise_prob_cal", r.get("rise_prob", 0.0))),
+        market_state=state,
+        acc_30d=float(acc_30d) if acc_30d is not None else None,
+        tactic_hits=list(tags.keys()),
+        drawdown=float(r.get("drawdown", 0.0)),
+        fin=r.get("fin_res", {}) or {},
+        tech={
+            "rsi6":      float(last.get("rsi6") or 50),
+            "macd_hist": float(last.get("macd_hist") or 0),
+        },
+        news_summary=news_summary,
+        global_rank=int(r.get("global_rank", 0) or 0),
+        scan_total=int(total or 0),
+        sector=sector or "",
+    )
+    reason = generate(ctx)
+    elems = render_card_section(reason)
+    return elems[0]["content"] if elems else ""
 
 
 def cmd_scan_bot(top_n: int = 5) -> dict:
@@ -997,6 +1127,10 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
 
     # 战法多维评分（并行拉取 top-N 财务数据，追加战法标签）
     top = _enrich_tactic_scores(top, workers=workers)
+
+    # P2 D3:共振股调 rank_pct,重排 top 让共振股前移
+    _apply_resonance_boost(top)
+    top.sort(key=lambda r: float(r.get("global_rank_pct", 1.0)))
 
     # 获取热点行业数据
     try:
@@ -1209,6 +1343,15 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
         for tactic in ALL_TACTICS:
             if tactic in tags and tactic in reasons:
                 lines.append(f"· **{tactic}**：{reasons[tactic]}")
+
+        # P2:LLM 深度推荐理由(失败优雅降级,不阻断)
+        try:
+            ai_section = _build_ai_reason_text(r, pos_news + neg_news, total, sector)
+            if ai_section:
+                lines.append("")
+                lines.append(ai_section)
+        except Exception as _e:
+            log.debug(f"[ai_reason] {code} skip: {_e}")
 
         # 上涨理由
         if bull_pts:

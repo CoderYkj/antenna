@@ -15,7 +15,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from learning import feedback_io, alerts, market_state, model_learner
+from learning import feedback_io, alerts, market_state, model_learner, tactic_learner
 
 
 # ── 模块注册表(按依赖顺序) ─────────────────────────────
@@ -30,7 +30,12 @@ MODULES: list[dict] = [
         "run":        model_learner.run,
         "depends_on": ["market_state"],
     },
-    # P2/P3/P4 后续阶段追加
+    {
+        "name":       "tactic_learner",
+        "run":        tactic_learner.run,
+        "depends_on": ["market_state"],
+    },
+    # P3/P4 后续阶段追加
 ]
 
 
@@ -81,7 +86,8 @@ def check() -> int:
         Path("learning/market_state.json"),
         Path("learning/strategy.json"),
         Path("learning/model_learner.json"),  # P1 产物
-        # P2-P4 阶段会追加 tactic_params.json / feature_weights.json / price_params.json / blacklist.json
+        Path("learning/tactic_params.json"),  # P2 产物
+        # P3-P4 阶段会追加 feature_weights.json / price_params.json / blacklist.json
     ]
     errors = []
     for p in files_to_check:

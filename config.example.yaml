@@ -71,3 +71,8 @@ pm2_monitor:
   username:     admin
   password:     "CHANGE_ME"           # 建议改成强密码
   log_lines:    200
+
+# ── P2 ai_reason LLM 深度推荐理由 ────────────────────────
+# 可选;启用后 cmd_scan_bot 的 Top-N 每股调一次 LLM(缓存 24h;日封顶 50 次)
+ai_reason:
+  enable:       true                  # false 则 cmd_scan_bot 不调 LLM

@@ -87,8 +87,16 @@ class TestRunAllNoModelGraceful:
         monkeypatch.setattr(feedback_io, "HISTORY_DIR", tmp_path / "history")
         (tmp_path / "data").mkdir()
         # 让 market_state.run 返回 ok 不碰网络
-        monkeypatch.setattr(market_state, "run",
-                            lambda date_str=None: {"current": "range"})
+        fake_state = lambda date_str=None: {"current": "range"}
+        monkeypatch.setattr(market_state, "run", fake_state)
+        # 同时替换 MODULES 里的 run 引用(orchestrator 导入时早绑定)
+        patched = []
+        for m in orchestrator.MODULES:
+            if m["name"] == "market_state":
+                patched.append({**m, "run": fake_state})
+            else:
+                patched.append(m)
+        monkeypatch.setattr(orchestrator, "MODULES", patched)
         # yaml 用默认路径,确保存在
         yaml_path = tmp_path / "model_learner.yaml"
         yaml_path.write_text(

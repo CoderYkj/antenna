@@ -1,0 +1,122 @@
+{
+  "version": 1,
+  "last_calibrated": "2026-05-11T15:06:03",
+  "current_state": "range",
+  "params": {
+    "bull": {
+      "value": {
+        "roe_min": 8.0,
+        "debt_ratio_max": 50.0,
+        "total_score_min": 2.0,
+        "acc_90d": null,
+        "samples": 0,
+        "status": "insufficient_samples",
+        "weight": 0.05
+      },
+      "growth": {
+        "rev_growth_min": 15.0,
+        "profit_growth_min": 15.0,
+        "roe_min": 12.0,
+        "acc_90d": null,
+        "samples": 0,
+        "status": "insufficient_samples",
+        "weight": 0.05
+      },
+      "leader": {
+        "roe_min": 15.0,
+        "gross_margin_min": 30.0,
+        "above_ma60_required": true,
+        "acc_90d": null,
+        "samples": 0,
+        "status": "insufficient_samples",
+        "weight": 0.05
+      },
+      "contra": {
+        "drawdown_max": -0.15,
+        "roe_min": 3.0,
+        "debt_ratio_max": 65.0,
+        "acc_90d": null,
+        "samples": 0,
+        "status": "insufficient_samples",
+        "weight": 0.05
+      }
+    },
+    "bear": {
+      "value": {
+        "roe_min": 12.0,
+        "debt_ratio_max": 40.0,
+        "total_score_min": 3.0,
+        "acc_90d": null,
+        "samples": 0,
+        "status": "insufficient_samples",
+        "weight": 0.05
+      },
+      "growth": {
+        "rev_growth_min": 20.0,
+        "profit_growth_min": 20.0,
+        "roe_min": 15.0,
+        "acc_90d": null,
+        "samples": 0,
+        "status": "insufficient_samples",
+        "weight": 0.05
+      },
+      "leader": {
+        "roe_min": 18.0,
+        "gross_margin_min": 35.0,
+        "above_ma60_required": true,
+        "acc_90d": null,
+        "samples": 0,
+        "status": "insufficient_samples",
+        "weight": 0.05
+      },
+      "contra": {
+        "drawdown_max": -0.2,
+        "roe_min": 5.0,
+        "debt_ratio_max": 55.0,
+        "acc_90d": null,
+        "samples": 0,
+        "status": "insufficient_samples",
+        "weight": 0.05
+      }
+    },
+    "range": {
+      "value": {
+        "roe_min": 8.0,
+        "debt_ratio_max": 50.0,
+        "total_score_min": 2.0,
+        "acc_90d": null,
+        "samples": 0,
+        "status": "insufficient_samples",
+        "weight": 0.05
+      },
+      "growth": {
+        "rev_growth_min": 15.0,
+        "profit_growth_min": 15.0,
+        "roe_min": 12.0,
+        "acc_90d": null,
+        "samples": 0,
+        "status": "insufficient_samples",
+        "weight": 0.05
+      },
+      "leader": {
+        "roe_min": 15.0,
+        "gross_margin_min": 30.0,
+        "above_ma60_required": true,
+        "acc_90d": null,
+        "samples": 0,
+        "status": "insufficient_samples",
+        "weight": 0.05
+      },
+      "contra": {
+        "drawdown_max": -0.15,
+        "roe_min": 3.0,
+        "debt_ratio_max": 65.0,
+        "acc_90d": null,
+        "samples": 0,
+        "status": "insufficient_samples",
+        "weight": 0.05
+      }
+    }
+  },
+  "history": []
+}

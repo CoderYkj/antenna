@@ -1,0 +1,84 @@
+# tactic_learner.yaml — P2 战法层可调参数
+# 所有数值不进代码常量;调参不改代码,改本文件即可。
+# 加载方式:learning.tactic_learner.load_config()
+#
+# direction 含义(D5 决策):
+#   tighten_up   — 提高数值 = 更严(ROE/营收增速/总评分等"min 类"阈值)
+#   tighten_down — 降低数值 = 更严(debt_ratio/drawdown 等"max 类"阈值)
+
+# ── 4 战法默认阈值(冷启动 / 单桶不足时回退) ─────────────
+defaults:
+  value:
+    roe_min:          {value:  8.0,  direction: tighten_up}
+    debt_ratio_max:   {value: 50.0,  direction: tighten_down}
+    total_score_min:  {value:  2.0,  direction: tighten_up}
+  growth:
+    rev_growth_min:    {value: 15.0, direction: tighten_up}
+    profit_growth_min: {value: 15.0, direction: tighten_up}
+    roe_min:           {value: 12.0, direction: tighten_up}
+  leader:
+    roe_min:          {value: 15.0, direction: tighten_up}
+    gross_margin_min: {value: 30.0, direction: tighten_up}
+    above_ma60_required: true       # 布尔值不参与微调
+  contra:
+    drawdown_max:    {value: -0.15, direction: tighten_down}
+    roe_min:          {value:  3.0, direction: tighten_up}
+    debt_ratio_max:   {value: 65.0, direction: tighten_down}
+
+# ── bear 市场默认值 override(D4 决策) ───────────────────
+# 当前 history 中 bear=0 天,P2 上线后可能数年学不到 bear 阈值。
+# 手工调严:提高 ROE 门槛、收紧 debt_ratio,即使桶样本永远不足也有保守兜底。
+defaults_bear_override:
+  value:
+    roe_min:          12.0    # 8 → 12
+    debt_ratio_max:   40.0    # 50 → 40
+    total_score_min:   3.0    # 2 → 3
+  growth:
+    rev_growth_min:    20.0   # 15 → 20
+    profit_growth_min: 20.0
+    roe_min:           15.0
+  leader:
+    roe_min:           18.0   # 15 → 18
+    gross_margin_min:  35.0   # 30 → 35
+  contra:
+    drawdown_max:     -0.20   # -0.15 → -0.20,bear 需更深超跌才入场
+    roe_min:           5.0    # 3 → 5
+    debt_ratio_max:   55.0    # 65 → 55
+
+# ── 调参锁定范围(防"学飞") ──────────────────────────────
+bounds:
+  value:
+    roe_min:         [5.0, 15.0]
+    debt_ratio_max:  [40.0, 60.0]
+    total_score_min: [1.0, 4.0]
+  growth:
+    rev_growth_min:    [10.0, 25.0]
+    profit_growth_min: [10.0, 25.0]
+    roe_min:           [8.0, 18.0]
+  leader:
+    roe_min:          [12.0, 20.0]
+    gross_margin_min: [25.0, 40.0]
+  contra:
+    drawdown_max:    [-0.25, -0.10]
+    roe_min:          [2.0, 8.0]
+    debt_ratio_max:  [55.0, 75.0]
+
+# ── 单次调整步长(绝对值,方向由 direction 决定) ─────────
+step:
+  default:  1.0       # 大部分阈值用 ±1
+  drawdown: 0.01      # drawdown 用 ±0.01(数值更小)
+
+# ── 精准率评估窗口 ──────────────────────────────────────
+evaluation:
+  lookback_days:  90
+  min_samples:    30      # 单 (state, tactic) 桶 <30 维持上版
+  acc_low:        0.30    # < 此值收严
+  acc_high:       0.60    # > 此值放宽
+
+# ── 共振权重(D3 决策:调 rank_pct,不动 rise_prob/prob_cal) ─
+weights:
+  enable_resonance_rank_boost: true
+  rank_boost_per_tactic:        0.02   # 命中 N 战法,rank_pct -= N×0.02(向前提名次)
+  rank_boost_max:               0.06   # 最多提 6%(等效 3 战法满共振)
+  weight_min:                   0.05   # 单战法权重下限
+  weight_max:                   0.40   # 单战法权重上限

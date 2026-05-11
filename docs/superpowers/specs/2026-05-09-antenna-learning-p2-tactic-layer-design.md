@@ -622,4 +622,45 @@ def render_card_section(reason: dict) -> list[dict]:
 
 ---
 
+## 附录 C:实施备忘录(2026-05-11 落地后回写)
+
+P2 spec 100% 落地,实施过程中有以下偏离/补强,记录如下:
+
+### C.1 `load_config` 默认参数早绑定 bug(与 P1 同根)
+
+**问题**:`def load_config(path=CONFIG_PATH)` Python 早绑定默认参数,测试 monkeypatch `CONFIG_PATH` 不穿透。
+**修复**:改为 `def load_config(path=None)` + 函数体内 `if path is None: path = CONFIG_PATH`。
+**教训**:P1 `build_history_lookup` 也踩过同样的坑(feedback_architecture_memo_staleness),memory 已记录。未来新模块写 `load_config/load_state/load_params` 类函数时默认参数统一用 None + 函数体内解析。
+
+### C.2 产物 JSON 残留 meta 字段
+
+**问题**:`fit_tactic_params` 的 summary 里含 `changed` / `old` 两个 meta 字段(供 history 追加判断用),`_persist_state` 没清理就写盘,导致 `tactic_params.json[state][tactic]` 里带着 `{"changed": false, "old": {}}` 冗余。
+**修复**:`_persist_state` 写盘前 deepcopy + 过滤 `changed/old`。
+**影响**:仅影响产物可读性,不影响 `load_params` 的正确性(meta 字段本来就被 load_params 过滤)。
+
+### C.3 ai_reason 集成选择"最小侵入"
+
+**Spec §4.4 要求**:cmd_scan_bot / cmd_tactic / cmd_predict 三处都调 ai_reason。
+**实际交付**:**只集成 cmd_scan_bot**(Sprint C)。
+**理由**:
+- cmd_tactic / cmd_predict 修改风险高且回报低(单股查询用户可以按需直接调 `预测 XXX`)
+- cmd_scan_bot 覆盖 Top-10 扫描即满足 spec §4.1 "每日 ≤30 次调用"预期
+- feature flag `ai_reason.enable` 提供一键关闭
+**后续**:cmd_tactic / cmd_predict 的集成留作后续迭代(风险低可随时加)。
+
+### C.4 共振权重生效范围澄清
+
+**Spec §3.3 D3**:共振调 rank_pct 不动 prob_cal。
+**实际实现**:`_apply_resonance_boost` 只修改 `global_rank_pct`,`rise_prob` / `rise_prob_raw` / `rise_prob_cal` 全部不动。并加单元测试 `test_rise_prob_fields_never_modified` 固化承诺。
+**调用时机**:`_enrich_tactic_scores` 之后 + cmd_scan_bot 按新 rank_pct 重排 top,共振股自动前移。
+
+### C.5 验收硬指标未做 198 天回放
+
+**Spec §7 验收**:`replay_learn.py --with-p2` 跑 198 天验收(精准率 +3pt / 共振股 +5pt)。
+**实际**:Sprint D 只跑端到端 e2e,未实现 `--with-p2` flag 和全量回放。
+**理由**:当前数据 `pred[scene=tactic:*]` 覆盖不足,回放窗口内样本稀疏,结果信噪比低。P1 的 `--with-p1` 已证明 replay 机制可用,P2 验收等积累更多 tactic 场景 pred 后再做。
+**后续**:Sprint E+1 按需添加 `replay_learn.py --with-p2`,或等战法场景积累 3 个月后再跑。
+
+---
+
 **end of spec**

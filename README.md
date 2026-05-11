@@ -320,6 +320,28 @@ No.1 名称（代码）　方向　综合评分 9.5
 | `scripts/backfill_market_state.py` | 沪深 300 历史回放，重塑 200+ 天状态序列 |
 | `scripts/replay_learn.py --with-p1` | 198 天验收：baseline vs P1 精准率 + Brier 对比 |
 
+### P2 — 战法层（✅ 已上线）
+
+**目标**：4 战法阈值自适应 + 战法权重学习 + LLM 深度推荐理由。
+
+| 组件 | 职责 |
+|------|------|
+| `learning/tactic_learner.py` | 4 战法 × 3 状态 = 12 桶独立统计 90 日精准率；阈值按 direction 标记微调；权重 = 精准率归一化 |
+| `learning/tactic_learner.yaml` | defaults / bear override / bounds / step / evaluation / weights |
+| `server/predict_cmd._enrich_tactic_scores` | 读 `tactic_params.json[state]` 替代硬编码阈值 |
+| `server/predict_cmd._apply_resonance_boost` | 共振股(≥2 战法命中)调 `global_rank_pct`,不动 `rise_prob_cal` |
+| `server/ai_reason.py` | Qwen3 → Claude Haiku → None 三级降级；24h 缓存；日封顶 50 |
+
+**P2 关键设计决策**(详见 [spec](docs/superpowers/specs/2026-05-09-antenna-learning-p2-tactic-layer-design.md))：
+
+- **D3 共振机制**：不动 `rise_prob_cal`（保留 calibrator 真实命中率承诺），改为调整 `global_rank_pct`
+- **D4 bear 桶兜底**：当前 history bear=0 天，`defaults_bear_override` 手工调严（ROE/负债要求更高）
+- **D5 阈值收严方向**：每阈值附 `direction: tighten_up / tighten_down`，修复旧版"全部 +step"对 max 类阈值方向错误的 bug
+
+**成本**：ai_reason 预期 0.5 元/月（缓存命中 ≥50%），日调用硬封顶 50 次。
+
+### P3/P4 — 路线图（⏳ 未启动）
+
 **P1 投产流程**：
 
 ```bash
@@ -348,12 +370,11 @@ python scripts/replay_learn.py --with-p1 --abs-threshold 0.30
 
 P1 的核心价值是**把用户看到的概率校准到真实命中率**——避免"模型说 70% 实际只中 30%"的过度乐观。
 
-### P2/P3/P4 — 路线图（⏳ 未启动）
+### P3/P4 — 路线图（⏳ 未启动）
 
-- **P2 战法层**：`tactic_learner`（阈值/权重自适应）+ `ai_reason`（LLM 深度理由）
-- **P3 特征层**：`alt_data`（资金面 / 情绪面）+ `feature_learner`（指标贡献度）
+- **P3 特征层**：`feature_learner`（Permutation Importance + 8 周淘汰）+ `alt_data`（主力净流入/龙虎榜/北向资金）
 - **P4 价位层**：`price_learner`（ATR / 振幅系数网格搜索）
-- **横向**：连错股票黑名单，推荐路径过滤
+- **横向黑名单**：同 `(code, state)` 连续 3 次 buy+miss → 拉黑 30 天
 
 ---
 
