@@ -374,7 +374,16 @@ P1 的核心价值是**把用户看到的概率校准到真实命中率**——�
 
 - **P3 特征层**：`feature_learner`（Permutation Importance + 8 周淘汰）+ `alt_data`（主力净流入/龙虎榜/北向资金）
 - **P4 价位层**：`price_learner`（ATR / 振幅系数网格搜索）
-- **横向黑名单**：同 `(code, state)` 连续 3 次 buy+miss → 拉黑 30 天
+
+### 横向 — 黑名单（✅ 已上线）
+
+| 组件 | 职责 |
+|------|------|
+| `learning/blacklist.py` | 同 `(code, state)` 连续 N 次 buy+miss/weak → 拉黑 30 天 |
+| `learning/blacklist.yaml` | streak_threshold / block_days / per_state_threshold（bear 更严格 2 次即拉黑）|
+| `server/predict_cmd.cmd_scan_bot` | `assign_global_signals` 之前过滤黑名单股票 |
+| **白名单 override** | watchlist 内的自选股永不参与拉黑判定 |
+| **自动过期** | 编排器每次跑都清理 `expires < today` 条目 |
 
 ---
 

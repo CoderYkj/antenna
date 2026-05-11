@@ -1,0 +1,221 @@
+{
+  "version": 1,
+  "updated_at": "2026-05-11T17:16:52",
+  "entries": {
+    "600967|range": {
+      "until": "2026-05-29",
+      "streak_count": 4,
+      "last_miss": "2026-04-24",
+      "added_at": "2026-04-29",
+      "reason": "range 状态下连续 4 次 buy+miss/weak"
+    },
+    "603105|range": {
+      "until": "2026-05-29",
+      "streak_count": 3,
+      "last_miss": "2026-04-24",
+      "added_at": "2026-04-29",
+      "reason": "range 状态下连续 3 次 buy+miss/weak"
+    },
+    "300471|range": {
+      "until": "2026-05-29",
+      "streak_count": 3,
+      "last_miss": "2026-04-23",
+      "added_at": "2026-04-29",
+      "reason": "range 状态下连续 3 次 buy+miss/weak"
+    },
+    "300581|range": {
+      "until": "2026-05-29",
+      "streak_count": 6,
+      "last_miss": "2026-04-23",
+      "added_at": "2026-04-29",
+      "reason": "range 状态下连续 6 次 buy+miss/weak"
+    },
+    "600775|range": {
+      "until": "2026-05-29",
+      "streak_count": 3,
+      "last_miss": "2026-04-23",
+      "added_at": "2026-04-29",
+      "reason": "range 状态下连续 3 次 buy+miss/weak"
+    },
+    "600621|range": {
+      "until": "2026-05-29",
+      "streak_count": 4,
+      "last_miss": "2026-04-22",
+      "added_at": "2026-04-29",
+      "reason": "range 状态下连续 4 次 buy+miss/weak"
+    },
+    "002365|range": {
+      "until": "2026-05-27",
+      "streak_count": 4,
+      "last_miss": "2026-04-21",
+      "added_at": "2026-04-27",
+      "reason": "range 状态下连续 4 次 buy+miss/weak"
+    },
+    "000001|range": {
+      "until": "2026-05-27",
+      "streak_count": 7,
+      "last_miss": "2026-04-20",
+      "added_at": "2026-04-27",
+      "reason": "range 状态下连续 7 次 buy+miss/weak"
+    },
+    "600737|range": {
+      "until": "2026-05-27",
+      "streak_count": 3,
+      "last_miss": "2026-04-20",
+      "added_at": "2026-04-27",
+      "reason": "range 状态下连续 3 次 buy+miss/weak"
+    },
+    "301367|range": {
+      "until": "2026-06-10",
+      "streak_count": 4,
+      "last_miss": "2026-05-08",
+      "added_at": "2026-05-11",
+      "reason": "range 状态下连续 4 次 buy+miss/weak"
+    },
+    "688708|range": {
+      "until": "2026-06-10",
+      "streak_count": 3,
+      "last_miss": "2026-05-08",
+      "added_at": "2026-05-11",
+      "reason": "range 状态下连续 3 次 buy+miss/weak"
+    }
+  },
+  "history": [
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600967",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "603105",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "300471",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "300581",
+      "state": "range",
+      "streak": 6,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600775",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600621",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "002365",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "000001",
+      "state": "range",
+      "streak": 7,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600737",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600967",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "603105",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "300471",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "300581",
+      "state": "range",
+      "streak": 6,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600775",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600621",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-05-11",
+      "action": "add",
+      "code": "301367",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-06-10"
+    },
+    {
+      "date": "2026-05-11",
+      "action": "add",
+      "code": "688708",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-06-10"
+    }
+  ]
+}

@@ -1080,6 +1080,26 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
     # 排序：涨概率 + 技术动量
     results.sort(key=lambda x: (x["rise_prob"], x["momentum"]), reverse=True)
 
+    # 横向黑名单过滤(assign_global_signals 之前,watchlist 不受影响)
+    try:
+        from learning.blacklist import load_blacklist
+        from learning import market_state as _ms
+        from learning.blacklist import load_config as _bl_load_config
+        bl_cfg = _bl_load_config()
+        if bl_cfg.enable_scan_filter:
+            bl = load_blacklist()
+            current_state = _ms.load_current_state().get("current", "range")
+            before_n = len(results)
+            results = [
+                r for r in results
+                if r["code"] in watchlist or not bl.is_blocked(r["code"], current_state)
+            ]
+            filtered_n = before_n - len(results)
+            if filtered_n > 0:
+                log.info(f"[blacklist] filtered {filtered_n} stocks in state={current_state}")
+    except Exception as _e:
+        log.debug(f"[blacklist] skip filter: {_e}")
+
     # 全局信号重新分配（基于全市场分布，消除各股独立排名的不可比性）
     from models.predictor import assign_global_signals
     assign_global_signals(results, buy_top_pct)

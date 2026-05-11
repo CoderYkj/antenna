@@ -1,0 +1,18 @@
+# blacklist.yaml — 横向黑名单可调参数
+# 所有数值不进代码常量;调参不改代码,改本文件即可。
+
+streak_threshold:       3      # 连续 N 次 buy+miss 触发(整体默认)
+block_days:             30     # 拉黑天数
+last_activity_max_days: 7      # 最后一次 miss 必须在 N 天内才拉黑(避免拉黑早已不出现的股票)
+lookback_days:          90     # 扫 pred/outcome 回溯天数
+
+# 按场景开关(B3 决策:默认仅 scan 过滤)
+enable_scan_filter:     true
+enable_tactic_filter:   false
+enable_predict_filter:  false
+
+# 按市场状态独立阈值(B2 决策:bear 更严格)
+per_state_threshold:
+  bull:   3
+  bear:   2      # bear 市场风险高,2 次即拉黑
+  range:  3
