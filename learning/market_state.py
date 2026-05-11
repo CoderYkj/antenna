@@ -25,16 +25,9 @@ HISTORY_CAP = 365  # P1 起 history 容量上限:覆盖一年回放窗口(Sprint
 
 
 def _atomic_write(path: Path, data: dict) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
-    try:
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, path)
-    except Exception:
-        if tmp.exists():
-            tmp.unlink(missing_ok=True)
-        raise
+    """原子写入,复用 feedback_io 的 Windows 友好 retry 封装。"""
+    from learning.feedback_io import atomic_write_json
+    atomic_write_json(path, data)
 
 
 def _classify(close: float, ma60: float, ret_60d: float, atr_pct: float) -> str:

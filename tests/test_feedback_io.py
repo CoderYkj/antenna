@@ -82,3 +82,42 @@ def test_atomic_write_on_tmp_suffix_path(workdir):
     assert target.exists()
     # temp 命名应是 weird.tmp.tmp,不会与 target 同名
     assert not (workdir / "weird.tmp.tmp").exists()
+
+
+# ── Windows PermissionError 重试机制 ──────────────────
+
+def test_replace_retries_on_permission_error(workdir, monkeypatch):
+    """Windows 偶发 PermissionError 时重试 + 退避,最终成功不抛。"""
+    import os
+    calls = {"count": 0}
+    real_replace = os.replace
+
+    def flaky_replace(src, dst):
+        calls["count"] += 1
+        if calls["count"] < 3:
+            raise PermissionError(13, "fake windows lock")
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(feedback_io.os, "replace", flaky_replace)
+    # 把 sleep 置空加速测试
+    monkeypatch.setattr(feedback_io.time, "sleep", lambda _: None)
+
+    target = workdir / "flaky.json"
+    feedback_io.atomic_write_json(target, {"ok": True})
+    assert target.exists()
+    assert calls["count"] == 3  # 前 2 次失败,第 3 次成功
+
+
+def test_replace_gives_up_after_max_retries(workdir, monkeypatch):
+    """重试耗尽仍失败 → 抛出原 PermissionError,且清理 .tmp 文件。"""
+    def always_fail(src, dst):
+        raise PermissionError(13, "persistent lock")
+
+    monkeypatch.setattr(feedback_io.os, "replace", always_fail)
+    monkeypatch.setattr(feedback_io.time, "sleep", lambda _: None)
+
+    target = workdir / "stuck.json"
+    with pytest.raises(PermissionError):
+        feedback_io.atomic_write_json(target, {"x": 1})
+    # .tmp 应已清理
+    assert not (workdir / "stuck.json.tmp").exists()

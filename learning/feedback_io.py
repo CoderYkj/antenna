@@ -11,12 +11,35 @@ feedback_io.py - 学习模块的统一 I/O 工具。
 import json
 import os
 import shutil
+import time
 from datetime import datetime
 from pathlib import Path
 
 FEEDBACK_DIR = Path("learning/feedback")
 HISTORY_DIR = Path("learning/history")
 MAX_SNAPSHOTS = 7
+
+# Windows 上 os.replace 在目标文件被其他进程打开读取时会抛 PermissionError(13)。
+# 典型场景:antenna-bot 在读 market_state.json,同时"学习"指令正要 os.replace 新版本。
+# Linux 下 os.replace 是原子的无此问题。
+# 此处的 retry 只对 Windows 场景救命;Linux 第一次就会成功。
+_REPLACE_RETRY_TIMES = 5
+_REPLACE_RETRY_BASE  = 0.05   # 初始 50ms,指数退避 × 2
+
+
+def _os_replace_with_retry(tmp: Path, path: Path) -> None:
+    """Windows 文件锁友好的 os.replace 封装,PermissionError 重试。"""
+    last_err: Exception | None = None
+    for attempt in range(_REPLACE_RETRY_TIMES):
+        try:
+            os.replace(tmp, path)
+            return
+        except PermissionError as e:
+            last_err = e
+            if attempt == _REPLACE_RETRY_TIMES - 1:
+                break
+            time.sleep(_REPLACE_RETRY_BASE * (2 ** attempt))
+    raise last_err if last_err else RuntimeError("replace failed without error")
 
 
 def atomic_write_json(path: Path, data: dict) -> None:
@@ -26,7 +49,7 @@ def atomic_write_json(path: Path, data: dict) -> None:
     try:
         with open(tmp, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        os.replace(tmp, path)
+        _os_replace_with_retry(tmp, path)
     except BaseException:
         # 覆盖 KeyboardInterrupt/SystemExit 等非 Exception 子类,保证不留 .tmp
         tmp.unlink(missing_ok=True)
