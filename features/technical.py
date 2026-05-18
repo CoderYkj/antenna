@@ -109,3 +109,21 @@ def add_indicators(df: pd.DataFrame) -> pd.DataFrame:
             df[col] = pd.to_numeric(df[col], errors="coerce")
 
     return df
+
+
+import json as _json
+from pathlib import Path as _Path
+
+_FEATURE_WEIGHTS_PATH = _Path("learning/feature_weights.json")
+
+
+def get_active_feature_cols() -> list[str]:
+    """返回当前激活特征列表。文件缺失 / active 为空 / 解析失败 → 回退完整 FEATURE_COLS。"""
+    try:
+        if not _FEATURE_WEIGHTS_PATH.exists():
+            return FEATURE_COLS
+        data = _json.loads(_FEATURE_WEIGHTS_PATH.read_text(encoding="utf-8"))
+        active = data.get("active", [])
+        return active if active else FEATURE_COLS
+    except Exception:
+        return FEATURE_COLS

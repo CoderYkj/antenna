@@ -79,6 +79,12 @@ def predict(
     if model is None:
         model = load_latest_model(model_dir) if "load_latest_model" in globals() else load_model(model_dir)
 
+    # 补齐缺失特征列（dropped 特征不在 df 中时填 0）
+    df = df.copy()
+    for col in feature_cols:
+        if col not in df.columns:
+            df[col] = 0.0
+
     valid = df[feature_cols].dropna()
     if valid.empty:
         raise ValueError("No valid rows after dropping NaN — need more history data.")

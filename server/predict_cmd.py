@@ -292,7 +292,7 @@ def cmd_predict(code: str) -> dict:
     """
     from data.fetcher import fetch_stock_hist, fetch_realtime_prices, fetch_intraday_kline
     from features.builder import build_features
-    from features.technical import FEATURE_COLS
+    from features.technical import get_active_feature_cols
     from features.analyser import analyse, predict_range, build_commentary, suggest_holding, suggest_trade_levels, text_intraday_kline
     from models.predictor import load_model, predict
     from learning.optimizer import load_strategy
@@ -314,7 +314,7 @@ def cmd_predict(code: str) -> dict:
 
     # 模型预测
     try:
-        result = predict(df, FEATURE_COLS,
+        result = predict(df, get_active_feature_cols(),
                          model_dir=cfg["model"]["saved_dir"],
                          buy_top_pct=buy_top_pct)
     except Exception as e:
@@ -1009,7 +1009,7 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
     from data.fetcher import fetch_stock_hist, fetch_realtime_prices, cached_codes
     from data.universe import load_universe
     from features.builder import build_features
-    from features.technical import FEATURE_COLS
+    from features.technical import get_active_feature_cols
     from features.analyser import predict_range, suggest_trade_levels, suggest_dual_period_trades
     from models.predictor import load_model, predict
     from learning.optimizer import load_strategy
@@ -1042,7 +1042,7 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
     def _scan_one(code):
         df = fetch_stock_hist(code, days=365, cache_only=True)
         df = build_features(df)
-        r  = predict(df, FEATURE_COLS, model=model, buy_top_pct=buy_top_pct)
+        r  = predict(df, get_active_feature_cols(), model=model, buy_top_pct=buy_top_pct)
         last = df.iloc[-1]
         momentum = (
             float(last.get("rsi6", 50) or 50) / 100
@@ -1623,7 +1623,7 @@ def _tactic_run(strategy: str, top_n: int, all_codes: list,
         _load_name_map, fetch_realtime_prices,
     )
     from features.builder import build_features
-    from features.technical import FEATURE_COLS
+    from features.technical import get_active_feature_cols
     from features.analyser import predict_range, suggest_dual_period_trades, suggest_holding
     from features.fundamental import analyse_financials
     from models.predictor import load_model, predict
@@ -1750,7 +1750,7 @@ def _tactic_run(strategy: str, top_n: int, all_codes: list,
                 fetch_stock_hist(code, days=365, cache_only=True)
             )
             if model is not None:
-                r_pred  = predict(df_feat, FEATURE_COLS, model=model)
+                r_pred  = predict(df_feat, get_active_feature_cols(), model=model)
                 rise_prob = r_pred.get("rise_prob", 0.55)
             last_row   = df_feat.iloc[-1].to_dict()
             price_info = predict_range(df_feat, rise_prob)
@@ -2032,7 +2032,7 @@ def cmd_backtest_bot(arg: str = None, top_n: int = 10,
         from concurrent.futures import ThreadPoolExecutor, as_completed
         from data.fetcher import cached_codes, fetch_stock_hist
         from features.builder import build_features
-        from features.technical import FEATURE_COLS
+        from features.technical import get_active_feature_cols
         from models.predictor import load_model, predict
         from learning.tracker import log_predictions, log_outcomes
         from learning.optimizer import evaluate_day, optimize, load_strategy, build_review_report
@@ -2138,7 +2138,7 @@ def cmd_backtest_bot(arg: str = None, top_n: int = 10,
                     df = build_features(df)
                     if df.empty:
                         return None
-                    r    = predict(df, FEATURE_COLS, model=model, buy_top_pct=buy_top_pct)
+                    r    = predict(df, get_active_feature_cols(), model=model, buy_top_pct=buy_top_pct)
                     last = df.iloc[-1].to_dict()
                     momentum = (
                         float(last.get("rsi6",     50) or 50) / 100

@@ -114,13 +114,13 @@ def cmd_train(args, config):
 def cmd_predict(args, config):
     from data.fetcher import fetch_stock_hist
     from features.builder import build_features
-    from features.technical import FEATURE_COLS
+    from features.technical import get_active_feature_cols
     from models.predictor import predict
     from reports.renderer import render_report
 
     df = fetch_stock_hist(args.code, days=365)
     df = build_features(df)
-    result = predict(df, FEATURE_COLS, model_dir=config["model"]["saved_dir"])
+    result = predict(df, get_active_feature_cols(), model_dir=config["model"]["saved_dir"])
 
     print(f"\n{'='*40}")
     print(f"  股票代码:  {args.code}")
@@ -146,7 +146,7 @@ def cmd_scan(args, config):
     from data.fetcher import fetch_stock_hist, cached_codes
     from data.universe import load_universe
     from features.builder import build_features
-    from features.technical import FEATURE_COLS
+    from features.technical import get_active_feature_cols
     from models.predictor import load_model, predict
 
     pool_cfg = config["universe"].get("scan_pool", "watchlist")
@@ -171,7 +171,7 @@ def cmd_scan(args, config):
     def _scan_one(code):
         df = fetch_stock_hist(code, days=365, cache_only=True)
         df = build_features(df)
-        r = predict(df, FEATURE_COLS, model=model)
+        r = predict(df, get_active_feature_cols(), model=model)
         last = df.iloc[-1]
         momentum = (
             float(last.get("rsi6", 50) or 50) / 100
@@ -266,13 +266,13 @@ def cmd_scan(args, config):
 def cmd_report(args, config):
     from data.fetcher import fetch_stock_hist
     from features.builder import build_features
-    from features.technical import FEATURE_COLS
+    from features.technical import get_active_feature_cols
     from models.predictor import predict
     from reports.renderer import render_report
 
     df = fetch_stock_hist(args.code, days=365)
     df = build_features(df)
-    result = predict(df, FEATURE_COLS, model_dir=config["model"]["saved_dir"])
+    result = predict(df, get_active_feature_cols(), model_dir=config["model"]["saved_dir"])
     path = render_report(
         args.code, df.tail(120), result,
         output_dir=config["reports"]["output_dir"],
@@ -334,7 +334,7 @@ def cmd_backtest(args, config):
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from data.fetcher import cached_codes, fetch_stock_hist
     from features.builder import build_features
-    from features.technical import FEATURE_COLS
+    from features.technical import get_active_feature_cols
     from models.predictor import load_model, predict
     from learning.tracker import log_predictions, log_outcomes
     from learning.optimizer import evaluate_day, optimize, load_strategy
@@ -428,7 +428,7 @@ def cmd_backtest(args, config):
                 df = build_features(df)
                 if df.empty:
                     return None
-                r    = predict(df, FEATURE_COLS, model=model, buy_top_pct=buy_top_pct)
+                r    = predict(df, get_active_feature_cols(), model=model, buy_top_pct=buy_top_pct)
                 last = df.iloc[-1].to_dict()
                 momentum = (
                     float(last.get("rsi6",     50) or 50) / 100
