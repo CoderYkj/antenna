@@ -1,0 +1,13 @@
+# learning/feature_learner.yaml
+permutation:
+  n_repeats: 10          # permutation_importance 重复次数
+  lookback_days: 90      # 样本窗口（日历天数）
+
+drop:
+  importance_threshold: 0.05   # 低于此值计入"低重要"
+  candidate_weeks: 4           # 连续低重要 → candidate_drop
+  drop_weeks: 8                # 连续低重要 → dropped
+
+alt_data:
+  ic_threshold: 0.02     # |IC| 达标才加入 active
+  ic_lookback_days: 90
