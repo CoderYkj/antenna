@@ -1,0 +1,15 @@
+# learning/price_learner.yaml
+lookback_days: 90
+min_samples: 30
+
+grid:
+  short_atr_mult:   {min: 1.0, max: 2.5, step: 0.1}
+  short_gain_mult:  {min: 1.5, max: 3.0, step: 0.1}
+  long_amp_mult:    {min: 2.0, max: 4.0, step: 0.2}
+  long_ma60_buffer: {min: 0.95, max: 0.99, step: 0.01}
+
+defaults:
+  short_atr_mult:   1.5
+  short_gain_mult:  2.2
+  long_amp_mult:    3.0
+  long_ma60_buffer: 0.97
