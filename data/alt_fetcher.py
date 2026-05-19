@@ -188,11 +188,3 @@ def fetch_alt_features(
         logger.warning("[alt_fetcher] 缓存写入失败: %s", e)
 
     return result
-
-
-def _try_call(fn, *args, **kwargs):
-    try:
-        return fn(*args, **kwargs)
-    except Exception as e:
-        logger.warning("[alt_fetcher] %s 失败: %s", getattr(fn, "__name__", repr(fn)), e)
-        return None
