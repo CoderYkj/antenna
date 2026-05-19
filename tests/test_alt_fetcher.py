@@ -55,12 +55,11 @@ def test_all_features_fail_returns_empty_dict_per_code(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "data" / "cache" / "alt").mkdir(parents=True)
 
+    import data.alt_fetcher as m  # 确保模块已加载，patch 作用于当前函数对象
     with patch("data.alt_fetcher._fetch_fund_flow", side_effect=Exception), \
          patch("data.alt_fetcher._fetch_dragon_board", side_effect=Exception), \
          patch("data.alt_fetcher._fetch_sector_heat", side_effect=Exception), \
          patch("data.alt_fetcher._fetch_north_flow", side_effect=Exception):
-        from importlib import reload
-        import data.alt_fetcher as m; reload(m)
         result = m.fetch_alt_features(["600519"], "2026-05-18")
 
     assert result["600519"]["main_net_in_1d"] is None
@@ -74,12 +73,11 @@ def test_result_cached_to_parquet(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "data" / "cache" / "alt").mkdir(parents=True)
 
+    import data.alt_fetcher as m  # 确保模块已加载，patch 作用于当前函数对象
     with patch("data.alt_fetcher._fetch_fund_flow", return_value={"600519": (0.2, 0.1)}), \
          patch("data.alt_fetcher._fetch_dragon_board", return_value={"600519": 1}), \
          patch("data.alt_fetcher._fetch_sector_heat", return_value={"600519": 0.6}), \
          patch("data.alt_fetcher._fetch_north_flow", return_value={"600519": 0.05}):
-        from importlib import reload
-        import data.alt_fetcher as m; reload(m)
         m.fetch_alt_features(["600519"], "2026-05-19")
 
     cache_path = tmp_path / "data" / "cache" / "alt" / "2026-05-19.parquet"

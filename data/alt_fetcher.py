@@ -137,7 +137,8 @@ def fetch_alt_features(
             for _, row in cached_df.iterrows():
                 code = str(row.get("code", ""))
                 result[code] = {col: row.get(col) for col in ALT_COLS}
-            if result:
+            # 仅当所有请求的 codes 都在缓存中时才返回，否则补充拉取
+            if result and set(codes) <= set(result.keys()):
                 return result
         except Exception:
             pass
