@@ -213,8 +213,9 @@ def fit_price_params(date_str: str, cfg: PriceLearnerConfig | None = None) -> di
     feedback_io.write_feedback(
         "price_learner", date_str, {"cold_states": cold_states},
     )
-    status = "cold_start" if len(cold_states) == 3 else "ok"
-    return {"status": status, "cold_states": cold_states}
+    if cold_states:
+        return {"status": "cold_start", "cold_states": cold_states}
+    return {"status": "ok", "states": state_params}
 
 
 def run(date_str: str | None = None) -> dict:
