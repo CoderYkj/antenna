@@ -15,3 +15,13 @@ def get_all_codes() -> list:
     """返回全 A 股股票代码列表（通过新浪接口，约 5500 只）。"""
     df = ak.stock_info_a_code_name()
     return df["code"].tolist()
+
+
+def load_sector_map() -> dict:
+    """加载代码→行业映射。"""
+    import json
+    from pathlib import Path
+    p = Path("data/sector_map.json")
+    if not p.exists():
+        return {}
+    return json.loads(p.read_text(encoding="utf-8"))
