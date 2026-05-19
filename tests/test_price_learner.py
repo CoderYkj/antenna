@@ -90,7 +90,7 @@ def test_score_params_loss_triggers():
 # ── fit_price_params cold start ──────────────────────────────
 
 def test_fit_price_params_cold_start_uses_defaults(tmp_path, monkeypatch):
-    """样本 < min_samples 时各桶都回退默认值。"""
+    """样本 < min_samples 时各桶都回退默认值，status == 'cold_start'。"""
     monkeypatch.chdir(tmp_path)
     (tmp_path / "learning" / "data").mkdir(parents=True)
     cfg_yaml = (
@@ -103,11 +103,14 @@ def test_fit_price_params_cold_start_uses_defaults(tmp_path, monkeypatch):
         "  long_amp_mult: 3.0\n  long_ma60_buffer: 0.97\n"
     )
     (tmp_path / "learning" / "price_learner.yaml").write_text(cfg_yaml, encoding="utf-8")
+    from unittest.mock import patch
     from importlib import reload
     import learning.price_learner as m; reload(m)
-    cfg = m.load_config()
-    result = m.fit_price_params("2026-05-17", cfg)
-    assert result["status"] in ("cold_start", "ok")
+    with patch("learning.tracker.load_predictions_by_scene", return_value=[]):
+        cfg = m.load_config()
+        result = m.fit_price_params("2026-05-17", cfg)
+    assert result["status"] == "cold_start"
+    assert set(result["cold_states"]) == {"bull", "bear", "range"}
 
 
 # ── weekly skip ─────────────────────────────────────────────
@@ -117,3 +120,13 @@ def test_run_skips_on_non_sunday(tmp_path, monkeypatch):
     from learning.price_learner import run
     result = run("2026-05-18")  # Monday
     assert result["status"] == "skipped"
+
+
+def test_load_config_missing_raises_value_error(tmp_path, monkeypatch):
+    """price_learner.yaml 缺失时 load_config() 抛 ValueError。"""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "learning").mkdir()
+    from importlib import reload
+    import learning.price_learner as m; reload(m)
+    with pytest.raises(ValueError, match="price_learner.yaml"):
+        m.load_config()
