@@ -228,11 +228,10 @@ def _compute_ic(alt_df: pd.DataFrame, ic_threshold: float) -> list[str]:
 def _load_latest_model(model_dir: str = "models/saved"):
     """加载最新的 LightGBM 模型 pkl。"""
     import pickle
-    pkl_files = sorted(Path(model_dir).glob("*.pkl"))
-    # 优先非 calibrator
+    pkl_files = sorted(Path(model_dir).glob("*.pkl"), key=lambda f: f.stat().st_mtime)
     model_files = [f for f in pkl_files if "calibrat" not in f.name.lower()]
     if not model_files:
-        raise FileNotFoundError(f"models/saved 中无 pkl 文件")
+        raise FileNotFoundError(f"{model_dir} 中无 LightGBM pkl 文件")
     with open(model_files[-1], "rb") as f:
         return pickle.load(f)
 
