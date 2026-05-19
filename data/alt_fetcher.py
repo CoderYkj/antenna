@@ -47,8 +47,8 @@ def _fetch_fund_flow(codes: list[str]) -> dict[str, tuple[float | None, float | 
                 max(-1.0, min(1.0, net_1d / turnover)),
                 max(-1.0, min(1.0, net_5d / (turnover * 5))),
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("[alt_fetcher] fund_flow %s 失败: %s", code, exc)
     return result
 
 
@@ -113,6 +113,14 @@ def _fetch_north_flow(codes: list[str]) -> dict[str, float | None]:
 
 # ── 公开接口 ─────────────────────────────────────────────────
 
+def _try_call(fn, *args, **kwargs):
+    try:
+        return fn(*args, **kwargs)
+    except Exception as e:
+        logger.warning("[alt_fetcher] %s 失败: %s", getattr(fn, "__name__", repr(fn)), e)
+        return None
+
+
 def fetch_alt_features(
     codes: list[str],
     date_str: str,
@@ -163,10 +171,19 @@ def fetch_alt_features(
             "north_hold_chg_5d":  north.get(code)  if north  else None,
         }
 
-    # ── 写缓存 ───────────────────────────────────────────────
+    # ── 写缓存（合并已有数据，避免丢失历史 codes）───────────────
     try:
         rows = [{"code": code, **feats} for code, feats in result.items()]
-        pd.DataFrame(rows).to_parquet(cache_path, index=False)
+        new_df = pd.DataFrame(rows)
+        if cache_path.exists():
+            try:
+                existing_df = pd.read_parquet(cache_path)
+                # 以新数据为优先，保留旧数据中不在本次请求中的 codes
+                existing_df = existing_df[~existing_df["code"].isin(result.keys())]
+                new_df = pd.concat([existing_df, new_df], ignore_index=True)
+            except Exception:
+                pass  # 读旧缓存失败，直接用新数据
+        new_df.to_parquet(cache_path, index=False)
     except Exception as e:
         logger.warning("[alt_fetcher] 缓存写入失败: %s", e)
 
