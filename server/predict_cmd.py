@@ -1039,7 +1039,7 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
     fail_count = 0
     lock = threading.Lock()
 
-    def _scan_one(code, alt: dict | None = None):
+    def _scan_one(code: str, alt: dict | None = None):
         df = fetch_stock_hist(code, days=365, cache_only=True)
         df = build_features(df, alt=alt)
         r  = predict(df, get_active_feature_cols(), model=model, buy_top_pct=buy_top_pct)
@@ -1178,6 +1178,12 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
     pred_date, _ = _predict_date()
     scan_date    = _today()
 
+    try:
+        from learning.market_state import load_current_state as _lcs
+        _current_state = _lcs().get("current", "range")
+    except Exception:
+        _current_state = "range"
+
     snapshot = []
     for r in top:
         snapshot.append({
@@ -1193,6 +1199,7 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
             "scan_date":       scan_date,
             "pred_high":       r["price_info"].get("pred_high"),
             "pred_low":        r["price_info"].get("pred_low"),
+            "market_state":    _current_state,
             "scene":           "scan",
         })
 
@@ -1220,6 +1227,7 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
                     "scan_date":       scan_date,
                     "pred_high":       r["price_info"].get("pred_high"),
                     "pred_low":        r["price_info"].get("pred_low"),
+                    "market_state":    _current_state,
                     "watchlist":  True,
                     "scene":      "scan",
                 })

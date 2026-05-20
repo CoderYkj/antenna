@@ -18,7 +18,7 @@ import pytest
 
 
 # ── 常量路径 ────────────────────────────────────────────────
-_CMD_FILE = pathlib.Path("E:/antenna/server/predict_cmd.py")
+_CMD_FILE = pathlib.Path(__file__).parent.parent / "server" / "predict_cmd.py"
 
 
 # ── 辅助 ──────────────────────────────────────────────────
@@ -180,8 +180,12 @@ def test_cmd_scan_bot_passes_alt_per_code():
 
     # fetch_alt_features 应被调用一次
     mock_fetch_alt.assert_called_once()
+    import re
     call_codes, call_date = mock_fetch_alt.call_args[0]
     assert set(call_codes) == set(codes)
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}", call_date), (
+        f"call_date {call_date!r} does not match YYYY-MM-DD"
+    )
 
     # 每个股票提交时都带了对应的 alt dict
     assert len(submitted_calls) == len(codes)
