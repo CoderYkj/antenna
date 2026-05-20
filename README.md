@@ -21,6 +21,7 @@
 - [选股战法](#选股战法)
 - [学习系统](#学习系统-learning)
 - [策略自优化](#策略自优化)
+- [PM2 进程管理](#pm2-进程管理)
 - [定时任务](#定时任务)
 - [AI 闲聊](#ai-闲聊)
 
@@ -53,7 +54,7 @@ antenna/
 │   ├── predictor.py               # 推理 + 全市场信号双门槛分配
 │   └── saved/                     # 模型 pkl + calibrator pkl（gitignored）
 │
-├── learning/                      # 学习系统(P0 + P1)
+├── learning/                      # 学习系统(P0/P1/P2 + 横向黑名单)
 │   ├── tracker.py                 # pred/outcome JSONL 归档（含 scene 标签）
 │   ├── outcome_metrics.py         # hit_tier(miss/weak/good/great) + 5 日指标
 │   ├── market_state.py            # 大盘状态打标(bull/bear/range)，3 日防抖
@@ -62,10 +63,17 @@ antenna/
 │   ├── alerts.py                  # 飞书 + JSONL 三路告警
 │   ├── optimizer.py               # buy_top_pct 日级自动调参
 │   ├── scene_bucket.py            # 按 scene/state 分桶工具
+│   ├── backtest_history.py        # Walk-Forward 结果存档
 │   ├── model_learner.py           # ★ P1 isotonic 校准 + abs_threshold 自校 + 加权重训
 │   ├── model_learner.yaml         # P1 可配置参数
+│   ├── tactic_learner.py          # ★ P2 4战法×3状态=12桶阈值自适应 + 权重学习
+│   ├── tactic_learner.yaml        # P2 defaults / bear override / bounds / step
+│   ├── blacklist.py               # ★ 横向黑名单：连错股票自动拉黑 30 天
+│   ├── blacklist.yaml             # streak_threshold / block_days / per_state_threshold
 │   ├── strategy.json              # 当前选股策略状态（自动维护）
 │   ├── model_learner.json         # P1 校准状态 + threshold 历史
+│   ├── tactic_params.json         # P2 战法参数 + 权重（自动维护）
+│   ├── blacklist.json             # 当前黑名单条目（自动维护）
 │   ├── market_state.json          # 大盘状态历史（含 365 天容量）
 │   └── persona.txt                # AI 闲聊人设
 │
@@ -73,6 +81,7 @@ antenna/
 │   ├── feishu_poll.py             # 飞书轮询（每 5s，并发指令支持）
 │   ├── commands.py                # 指令词集合 + 路由
 │   ├── predict_cmd.py             # 全部飞书指令执行体（含 cmd_learn）
+│   ├── ai_reason.py               # ★ P2 LLM 深度推荐理由（Qwen3→Claude Haiku 三级降级）
 │   ├── watchlist.py               # 自选股管理
 │   ├── style_learner.py           # 风格采集 → persona.txt
 │   ├── feishu_push.py             # 主动推送
@@ -141,7 +150,11 @@ python cli.py train --weighted       # P1 加权重训（按历史 signal × hit
 # 前台启动（开发期）
 python server/feishu_poll.py
 
-# 或注册为 Windows 任务计划（生产）
+# PM2 托管启动（生产推荐）
+pm2 start ecosystem.config.cjs   # 同时启动 antenna-bot + pm2-monitor
+pm2 save                          # 持久化进程列表，重启系统后自动恢复
+
+# 或注册为 Windows 任务计划（无 PM2 时的替代方案）
 powershell -File scripts/setup_tasks.ps1
 ```
 
@@ -404,6 +417,79 @@ P0 内置自适应选股门槛，每日收盘后自动运行（独立于 P1 校�
 目标精准率 **55%**（A 股短线现实水平），状态持久化在 `learning/strategy.json`。
 
 P1 在此之上追加 `abs_threshold`（绝对概率门槛，月度自校），形成双门槛体系。
+
+---
+
+## PM2 进程管理
+
+生产环境推荐通过 PM2 托管，崩溃后自动重启、日志持久化、Web 监控面板一体化。
+
+### 前置条件
+
+```bash
+# 安装 PM2（需要 Node.js）
+npm install -g pm2
+```
+
+### ecosystem.config.cjs 进程清单
+
+| 进程名 | 启动脚本 | 说明 |
+|--------|---------|------|
+| `antenna-bot` | `server/start.cjs` → `feishu_poll.py` | 飞书机器人（主进程） |
+| `pm2-monitor` | `server/pm2_monitor.py` | Web 监控面板（Flask） |
+
+### 常用命令
+
+```bash
+# 启动全部
+pm2 start ecosystem.config.cjs
+
+# 查看进程状态
+pm2 status
+
+# 重启飞书机器人
+pm2 restart antenna-bot
+
+# 停止全部
+pm2 stop all
+
+# 持久化进程列表（系统重启后自动拉起）
+pm2 save
+pm2 startup           # 生成自启动脚本（Linux/macOS）
+# Windows 下改用任务计划调用 `pm2 resurrect`
+
+# 查看日志
+pm2 logs antenna-bot --lines 100
+pm2 logs pm2-monitor  --lines 50
+```
+
+日志文件默认路径：
+
+```
+logs/pm2-out.log           # antenna-bot 标准输出
+logs/pm2-error.log         # antenna-bot 错误
+logs/pm2-monitor-out.log   # pm2-monitor 标准输出
+logs/pm2-monitor-error.log # pm2-monitor 错误
+```
+
+### Web 监控面板（pm2-monitor）
+
+`server/pm2_monitor.py` 提供 Basic Auth 保护的 Web 面板，支持查看进程状态、Restart / Stop / Start 操作、查看最近日志。
+
+在 `config.yaml` 中配置：
+
+```yaml
+pm2_monitor:
+  host:      "0.0.0.0"    # 对外开放改为 0.0.0.0；仅本机访问保持 127.0.0.1
+  port:      9615
+  username:  "admin"
+  password:  "your_password"   # 必填，留空则拒绝启动
+  log_lines: 200               # /logs 页面显示最近多少行
+```
+
+面板地址：`http://<host>:9615`（每 10 秒自动刷新）。健康检查端点（无鉴权）：`http://<host>:9615/healthz`。
+
+> **注意**：`password` 未配置时 pm2-monitor 会拒绝启动，防止面板裸奔。
 
 ---
 
