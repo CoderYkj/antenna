@@ -10,6 +10,7 @@ learning/price_learner.py - P4 价位层:ATR/振幅系数网格搜索。
 """
 from __future__ import annotations
 
+import itertools
 import json
 import logging
 from dataclasses import dataclass
@@ -26,6 +27,15 @@ logger = logging.getLogger(__name__)
 CONFIG_PATH       = Path("learning/price_learner.yaml")
 PRICE_PARAMS_PATH = Path("learning/price_params.json")
 DATA_DIR          = Path("learning/data")
+
+_EMERGENCY_DEFAULTS: dict[str, float] = {
+    "short_atr_mult":   1.5,
+    "short_gain_mult":  2.2,
+    "long_amp_mult":    3.0,
+    "long_ma60_buffer": 0.97,
+}
+_SUNDAY    = 6   # datetime.weekday() convention
+_FALLBACK_ATR_PCT: float = 0.015  # assumed ATR/close ratio when cache is missing
 
 
 @dataclass(frozen=True)
@@ -57,14 +67,13 @@ def load_price_params(state: str) -> dict:
             data = json.loads(PRICE_PARAMS_PATH.read_text(encoding="utf-8"))
             if state in data:
                 return data[state]
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("[price_learner] 读 price_params.json 失败，回退 yaml defaults: %s", exc)
     try:
         cfg = load_config()
         return dict(cfg.defaults)
     except Exception:
-        return {"short_atr_mult": 1.5, "short_gain_mult": 2.2,
-                "long_amp_mult": 3.0, "long_ma60_buffer": 0.97}
+        return dict(_EMERGENCY_DEFAULTS)
 
 
 def _load_outcomes(date_str: str) -> dict[str, dict]:
@@ -134,7 +143,7 @@ def _build_buy_samples(date_str: str, state: str, lookback_days: int) -> pd.Data
             rows.append({
                 "hit_5d":          float(hit_5d),
                 "max_drawdown_5d": float(drawdown),
-                "atr_pct":         float(atr_pct) if atr_pct else 0.015,
+                "atr_pct":         float(atr_pct) if atr_pct else _FALLBACK_ATR_PCT,
                 "up_ratio":        up_ratio,
             })
         d += timedelta(days=1)
@@ -159,35 +168,35 @@ def _score_params(
     long_ma60_buffer: float,
 ) -> float:
     """score = (wins - losses) / n。win: hit_5d >= 止盈%; loss: drawdown <= -止损%。"""
-    wins = losses = 0
-    for _, row in samples.iterrows():
-        sell_pct = float(row["up_ratio"]) * short_gain_mult
-        stop_pct = float(row["atr_pct"]) * short_atr_mult
-        if float(row["hit_5d"]) >= sell_pct:
-            wins += 1
-        elif float(row["max_drawdown_5d"]) <= -stop_pct:
-            losses += 1
     n = len(samples)
-    return (wins - losses) / n if n > 0 else -1.0
+    if n == 0:
+        return -1.0
+    sell_pct = samples["up_ratio"] * short_gain_mult
+    stop_pct = samples["atr_pct"] * short_atr_mult
+    wins   = int((samples["hit_5d"] >= sell_pct).sum())
+    losses = int((samples["max_drawdown_5d"] <= -stop_pct).sum())
+    return (wins - losses) / n
 
 
 def _grid_search(samples: pd.DataFrame, cfg: PriceLearnerConfig) -> dict:
     g = cfg.grid
     best_params = dict(cfg.defaults)
     best_score  = -float("inf")
-    for s_atr in _arange(g["short_atr_mult"]["min"],   g["short_atr_mult"]["max"],   g["short_atr_mult"]["step"]):
-        for s_gain in _arange(g["short_gain_mult"]["min"], g["short_gain_mult"]["max"], g["short_gain_mult"]["step"]):
-            for l_amp in _arange(g["long_amp_mult"]["min"], g["long_amp_mult"]["max"], g["long_amp_mult"]["step"]):
-                for l_buf in _arange(g["long_ma60_buffer"]["min"], g["long_ma60_buffer"]["max"], g["long_ma60_buffer"]["step"]):
-                    score = _score_params(samples, s_atr, s_gain, l_amp, l_buf)
-                    if score > best_score:
-                        best_score  = score
-                        best_params = {
-                            "short_atr_mult":   s_atr,
-                            "short_gain_mult":  s_gain,
-                            "long_amp_mult":    l_amp,
-                            "long_ma60_buffer": l_buf,
-                        }
+    for s_atr, s_gain, l_amp, l_buf in itertools.product(
+        _arange(g["short_atr_mult"]["min"],   g["short_atr_mult"]["max"],   g["short_atr_mult"]["step"]),
+        _arange(g["short_gain_mult"]["min"],  g["short_gain_mult"]["max"],  g["short_gain_mult"]["step"]),
+        _arange(g["long_amp_mult"]["min"],    g["long_amp_mult"]["max"],    g["long_amp_mult"]["step"]),
+        _arange(g["long_ma60_buffer"]["min"], g["long_ma60_buffer"]["max"], g["long_ma60_buffer"]["step"]),
+    ):
+        score = _score_params(samples, s_atr, s_gain, l_amp, l_buf)
+        if score > best_score:
+            best_score  = score
+            best_params = {
+                "short_atr_mult":   s_atr,
+                "short_gain_mult":  s_gain,
+                "long_amp_mult":    l_amp,
+                "long_ma60_buffer": l_buf,
+            }
     return best_params
 
 
@@ -221,7 +230,7 @@ def fit_price_params(date_str: str, cfg: PriceLearnerConfig | None = None) -> di
 def run(date_str: str | None = None) -> dict:
     """编排器入口。非周日返回 skipped；异常上抛，由 orchestrator 捕获。"""
     date_str = date_str or datetime.now().strftime("%Y-%m-%d")
-    if datetime.strptime(date_str, "%Y-%m-%d").weekday() != 6:
+    if datetime.strptime(date_str, "%Y-%m-%d").weekday() != _SUNDAY:
         return {"status": "skipped", "reason": "weekly only (Sunday)"}
     cfg = load_config()
     return fit_price_params(date_str, cfg)
