@@ -1039,9 +1039,9 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
     fail_count = 0
     lock = threading.Lock()
 
-    def _scan_one(code):
+    def _scan_one(code, alt: dict | None = None):
         df = fetch_stock_hist(code, days=365, cache_only=True)
-        df = build_features(df)
+        df = build_features(df, alt=alt)
         r  = predict(df, get_active_feature_cols(), model=model, buy_top_pct=buy_top_pct)
         last = df.iloc[-1]
         momentum = (
@@ -1065,8 +1065,17 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
     workers = cfg.get("scan", {}).get("workers", 8)
     total   = len(codes)
 
+    # 拉取 alt_data 特征（失败不阻断扫描）
+    today_str = _today()
+    try:
+        from data.alt_fetcher import fetch_alt_features
+        alt_cache = fetch_alt_features(codes, today_str)
+    except Exception as _alt_err:
+        log.warning(f"[scan_bot] alt_data fetch failed, proceeding without alt features: {_alt_err}")
+        alt_cache = {}
+
     with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = {pool.submit(_scan_one, c): c for c in codes}
+        futures = {pool.submit(_scan_one, c, alt_cache.get(c, {})): c for c in codes}
         for fut in as_completed(futures):
             try:
                 results.append(fut.result())
