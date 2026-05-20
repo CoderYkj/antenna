@@ -25,7 +25,8 @@ def test_atr_stop_uses_custom_mult():
     last = _make_last(ma5=0.0, ma20=0.0, ma60=0.0, bb_upper=0.0, bb_lower=0.0, atr=0.3)
     price_info = _make_price_info(cur=10.0)
 
-    with patch("learning.price_learner.load_price_params", return_value=custom_pp),          patch("learning.market_state.load_current_state", return_value={"current": "bull"}):
+    with patch("learning.price_learner.load_price_params", return_value=custom_pp), \
+         patch("learning.market_state.load_current_state", return_value={"current": "bull"}):
         result = suggest_dual_period_trades(last, price_info, rise_prob=0.5)
 
     s = result["short"]
@@ -37,38 +38,29 @@ def test_atr_stop_uses_custom_mult():
     assert "ATR" in s["stop_desc"]
 
 
-def test_atr_stop_hardcoded_1_5_would_not_match():
-    """Confirm that with mult=0.5 the stop differs from what mult=1.5 would produce."""
+def test_lower_atr_mult_produces_tighter_stop():
+    """A lower short_atr_mult results in a higher (tighter) ATR stop price."""
     from features.analyser import suggest_dual_period_trades
 
-    mult_05 = {"short_atr_mult": 0.5, "short_gain_mult": 2.2,
+    mult_lo = {"short_atr_mult": 0.5, "short_gain_mult": 2.2,
                "long_amp_mult": 3.0, "long_ma60_buffer": 0.97}
-    mult_15 = {"short_atr_mult": 1.5, "short_gain_mult": 2.2,
+    mult_hi = {"short_atr_mult": 1.5, "short_gain_mult": 2.2,
                "long_amp_mult": 3.0, "long_ma60_buffer": 0.97}
-    last = _make_last(ma5=0.0, ma20=0.0, ma60=0.0, bb_upper=0.0, bb_lower=0.0, atr=1.0)
+    # atr=0.3: atr_stop_lo = 10.0 - 0.15 = 9.85 (> pct_stop 9.8 → atr branch)
+    #          atr_stop_hi = 10.0 - 0.45 = 9.55 (< pct_stop 9.8 → pct branch)
+    last = _make_last(ma5=0.0, ma20=0.0, ma60=0.0, bb_upper=0.0, bb_lower=0.0, atr=0.3)
     price_info = _make_price_info(cur=10.0)
 
-    with patch("learning.price_learner.load_price_params", return_value=mult_05),          patch("learning.market_state.load_current_state", return_value={"current": "range"}):
-        r05 = suggest_dual_period_trades(last, price_info, rise_prob=0.5)
+    with patch("learning.price_learner.load_price_params", return_value=mult_lo), \
+         patch("learning.market_state.load_current_state", return_value={"current": "range"}):
+        r_lo = suggest_dual_period_trades(last, price_info, rise_prob=0.5)
 
-    with patch("learning.price_learner.load_price_params", return_value=mult_15),          patch("learning.market_state.load_current_state", return_value={"current": "range"}):
-        r15 = suggest_dual_period_trades(last, price_info, rise_prob=0.5)
+    with patch("learning.price_learner.load_price_params", return_value=mult_hi), \
+         patch("learning.market_state.load_current_state", return_value={"current": "range"}):
+        r_hi = suggest_dual_period_trades(last, price_info, rise_prob=0.5)
 
-    # With atr=1.0: stop_atr_05 = 10.0 - 1.0*0.5 = 9.5; stop_atr_15 = 10.0 - 1.0*1.5 = 8.5
-    # pct_stop = 9.8; 9.5 > 9.8? No. 8.5 > 9.8? No. Both fall to pct stop 9.8 actually
-    # Use atr=0.3 to get atr > pct:
-    # atr_05 = 10.0 - 0.3*0.5 = 9.85 > 9.8 → atr branch
-    # atr_15 = 10.0 - 0.3*1.5 = 9.55 < 9.8 → pct branch (9.8)
-    # so with atr=1.0, both use pct stop 9.8 and will be equal.
-    # This test checks the atr stop desc when atr is dominant, as in test_atr_stop_uses_custom_mult.
-    # Instead just check stop prices are different when atr=0.3
-    last2 = _make_last(ma5=0.0, ma20=0.0, ma60=0.0, bb_upper=0.0, bb_lower=0.0, atr=0.3)
-    with patch("learning.price_learner.load_price_params", return_value=mult_05),          patch("learning.market_state.load_current_state", return_value={"current": "range"}):
-        r05b = suggest_dual_period_trades(last2, price_info, rise_prob=0.5)
-    with patch("learning.price_learner.load_price_params", return_value=mult_15),          patch("learning.market_state.load_current_state", return_value={"current": "range"}):
-        r15b = suggest_dual_period_trades(last2, price_info, rise_prob=0.5)
-
-    assert r05b["short"]["stop_price"] != r15b["short"]["stop_price"]
+    assert r_lo["short"]["stop_price"] != r_hi["short"]["stop_price"]
+    assert r_lo["short"]["stop_price"] > r_hi["short"]["stop_price"]  # lower mult → tighter stop
 
 
 def test_short_sell_uses_gain_mult():
@@ -80,7 +72,8 @@ def test_short_sell_uses_gain_mult():
     last = _make_last(ma5=0.0, ma20=0.0, ma60=0.0, bb_upper=0.0, bb_lower=0.0, atr=0.0)
     price_info = {"price": 10.0, "up_ratio": 2.0}
 
-    with patch("learning.price_learner.load_price_params", return_value=custom_pp),          patch("learning.market_state.load_current_state", return_value={"current": "range"}):
+    with patch("learning.price_learner.load_price_params", return_value=custom_pp), \
+         patch("learning.market_state.load_current_state", return_value={"current": "range"}):
         result = suggest_dual_period_trades(last, price_info, rise_prob=0.5)
 
     s = result["short"]
@@ -99,7 +92,8 @@ def test_long_sell_uses_amp_mult():
     last = _make_last(ma5=0.0, ma20=9.5, ma60=0.0, bb_upper=0.0, bb_lower=0.0, atr=0.0)
     price_info = {"price": 10.0, "up_ratio": 2.0}
 
-    with patch("learning.price_learner.load_price_params", return_value=custom_pp),          patch("learning.market_state.load_current_state", return_value={"current": "range"}):
+    with patch("learning.price_learner.load_price_params", return_value=custom_pp), \
+         patch("learning.market_state.load_current_state", return_value={"current": "range"}):
         result = suggest_dual_period_trades(last, price_info, rise_prob=0.5)
 
     long = result["long"]
@@ -119,20 +113,30 @@ def test_market_state_passed_to_load_price_params():
         return {"short_atr_mult": 1.5, "short_gain_mult": 2.2,
                 "long_amp_mult": 3.0, "long_ma60_buffer": 0.97}
 
-    with patch("learning.price_learner.load_price_params", side_effect=fake_load),          patch("learning.market_state.load_current_state", return_value={"current": "bear"}):
+    # Patch the module attribute — works because analyser uses deferred import,
+    # so `from learning.price_learner import name` re-binds from the patched module each call.
+    with patch("learning.price_learner.load_price_params", side_effect=fake_load), \
+         patch("learning.market_state.load_current_state", return_value={"current": "bear"}):
         suggest_dual_period_trades(_make_last(), _make_price_info(), rise_prob=0.5)
 
     assert calls == ["bear"]
 
 
 def test_default_params_fallback_when_dict_empty():
-    """Empty pp dict triggers .get() defaults; function still returns valid result."""
+    """Empty pp dict triggers .get() defaults; stop_desc confirms short_atr_mult=1.5 applied."""
     from features.analyser import suggest_dual_period_trades
 
-    with patch("learning.price_learner.load_price_params", return_value={}),          patch("learning.market_state.load_current_state", return_value={"current": "range"}):
-        result = suggest_dual_period_trades(_make_last(), _make_price_info(), rise_prob=0.5)
+    # atr=0.3, cur=10.0: atr_stop = 10.0 - 0.3*1.5(default) = 9.55 < pct_stop(9.8)
+    # → pct branch; but with atr=0.05: atr_stop = 10.0 - 0.05*1.5 = 9.925 > 9.8 → ATR branch
+    last = _make_last(ma5=0.0, ma20=0.0, ma60=0.0, bb_upper=0.0, bb_lower=0.0, atr=0.05)
+    with patch("learning.price_learner.load_price_params", return_value={}), \
+         patch("learning.market_state.load_current_state", return_value={"current": "range"}):
+        result = suggest_dual_period_trades(last, _make_price_info(cur=10.0), rise_prob=0.5)
 
+    s = result["short"]
     assert "short" in result and "long" in result
-    assert result["short"]["buy_price"] > 0
-    assert result["short"]["sell_price"] > result["short"]["buy_price"]
-    assert result["long"]["buy_price"] > 0
+    assert s["buy_price"] > 0
+    assert s["sell_price"] > s["buy_price"]
+    # ATR stop should apply with default short_atr_mult=1.5: stop = round(10.0 - 0.05*1.5, 2) = 9.93
+    assert s["stop_price"] == pytest.approx(9.93)
+    assert "ATR" in s["stop_desc"]

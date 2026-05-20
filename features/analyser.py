@@ -461,7 +461,7 @@ def suggest_dual_period_trades(last: dict, price_info: dict, rise_prob: float) -
     """
     分别为短线（1-5日）和长线（2-4周）给出买卖价位建议。
 
-    短线：MA5 / BB下轨入场，BB上轨 / pred_high 止盈，ATR×1.5 / 2% 止损
+    短线：MA5 / BB下轨入场，BB上轨 / pred_high 止盈，ATR×_SHORT_ATR_MULT / 2% 止损
     长线：MA20 入场，MA60 / 扩展目标止盈，MA60下方 / 5% 止损
 
     Returns: {
@@ -469,14 +469,17 @@ def suggest_dual_period_trades(last: dict, price_info: dict, rise_prob: float) -
         "long":  {buy_price, buy_desc, sell_price, sell_desc, stop_price, stop_desc, rr_ratio, gain_pct},
     }
     """
+    # deferred to avoid circular import with learning modules
     from learning.price_learner import load_price_params
     from learning.market_state import load_current_state
     _state = load_current_state().get("current", "range")
     _pp    = load_price_params(_state)
-    _SHORT_ATR_MULT   = float(_pp.get("short_atr_mult",   1.5))
-    _SHORT_GAIN_MULT  = float(_pp.get("short_gain_mult",  2.2))
-    _LONG_AMP_MULT    = float(_pp.get("long_amp_mult",    3.0))
-    _LONG_MA60_BUFFER = float(_pp.get("long_ma60_buffer", 0.97))
+    _SHORT_ATR_MULT    = float(_pp.get("short_atr_mult",   1.5))
+    _SHORT_GAIN_MULT   = float(_pp.get("short_gain_mult",  2.2))
+    _LONG_AMP_MULT     = float(_pp.get("long_amp_mult",    3.0))
+    _LONG_MA60_BUFFER  = float(_pp.get("long_ma60_buffer", 0.97))
+    _SHORT_STOP_FACTOR  = 0.98  # 2% fixed floor stop for short positions
+    _LONG_MAX_STOP_FACTOR = 0.92  # reject MA60 stop if it implies > 8% loss
 
     def _f(key, default=0.0):
         v = last.get(key, default)
@@ -536,8 +539,8 @@ def suggest_dual_period_trades(last: dict, price_info: dict, rise_prob: float) -
         s_sell      = round(s_buy * (1 + up_ratio * _SHORT_GAIN_MULT), 2)
         s_sell_desc = f"振幅目标 {s_sell}"
 
-    # 止损：ATR×1.5 或 2%（短线更紧）
-    s_stop_pct = round(s_buy * 0.98, 2)
+    # 止损：ATR×_SHORT_ATR_MULT 或 2%（短线更紧）
+    s_stop_pct = round(s_buy * _SHORT_STOP_FACTOR, 2)
     s_stop_atr = round(s_buy - atr * _SHORT_ATR_MULT, 2) if atr else None
     if s_stop_atr and s_stop_atr > s_stop_pct:
         s_stop      = s_stop_atr
@@ -595,7 +598,7 @@ def suggest_dual_period_trades(last: dict, price_info: dict, rise_prob: float) -
         l_stop_raw  = round(ma60 * _LONG_MA60_BUFFER, 2)
         l_stop_desc = f"MA60下方 {l_stop_raw}"
         # 超过 8% 时收紧为 5%
-        l_stop      = l_stop_raw if l_stop_raw >= l_buy * 0.92 else round(l_buy * (2 - _LONG_MA60_BUFFER), 2)
+        l_stop      = l_stop_raw if l_stop_raw >= l_buy * _LONG_MAX_STOP_FACTOR else round(l_buy * (2 - _LONG_MA60_BUFFER), 2)
         if l_stop != l_stop_raw:
             l_stop_desc = f"5%止损 {l_stop}"
     else:
