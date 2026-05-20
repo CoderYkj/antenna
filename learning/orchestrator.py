@@ -15,7 +15,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-from learning import feedback_io, alerts, market_state, model_learner, tactic_learner, blacklist
+from learning import feedback_io, alerts, market_state, model_learner, tactic_learner, blacklist, feature_learner, price_learner
 
 
 # ── 模块注册表(按依赖顺序) ─────────────────────────────
@@ -40,7 +40,18 @@ MODULES: list[dict] = [
         "run":        blacklist.run,
         "depends_on": ["market_state"],
     },
-    # P3/P4 后续阶段追加
+    {
+        "name":       "feature_learner",
+        "run":        feature_learner.run,
+        "depends_on": ["market_state"],
+        # feature_learner 用 permutation importance 跑最新模型产物;
+        # 模型过期时会自动回退(不会崩溃),故意不依赖 model_learner。
+    },
+    {
+        "name":       "price_learner",
+        "run":        price_learner.run,
+        "depends_on": ["market_state"],
+    },
 ]
 
 
@@ -93,7 +104,8 @@ def check() -> int:
         Path("learning/model_learner.json"),  # P1 产物
         Path("learning/tactic_params.json"),  # P2 产物
         Path("learning/blacklist.json"),      # 横向黑名单产物
-        # P3-P4 阶段会追加 feature_weights.json / price_params.json
+        Path("learning/feature_weights.json"),  # P3 产物
+        Path("learning/price_params.json"),      # P4 产物
     ]
     errors = []
     for p in files_to_check:

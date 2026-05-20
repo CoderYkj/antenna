@@ -106,3 +106,53 @@ def test_check_returns_nonzero_on_corrupt_json(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     code = orchestrator.check()
     assert code != 0
+
+
+# ── P3/P4 新模块注册测试 ──────────────────────────────────
+
+def test_registry_has_feature_learner():
+    names = [m["name"] for m in orchestrator.MODULES]
+    assert "feature_learner" in names
+
+
+def test_registry_has_price_learner():
+    names = [m["name"] for m in orchestrator.MODULES]
+    assert "price_learner" in names
+
+
+def test_check_passes_when_only_feature_weights_present(tmp_path, monkeypatch):
+    import json
+    (tmp_path / "learning").mkdir()
+    (tmp_path / "learning" / "feature_weights.json").write_text(
+        json.dumps({"weights": {}}), encoding="utf-8"
+    )
+    monkeypatch.chdir(tmp_path)
+    code = orchestrator.check()
+    assert code == 0
+
+
+def test_check_passes_when_only_price_params_present(tmp_path, monkeypatch):
+    import json
+    (tmp_path / "learning").mkdir()
+    (tmp_path / "learning" / "price_params.json").write_text(
+        json.dumps({"atr_mult": 1.5}), encoding="utf-8"
+    )
+    monkeypatch.chdir(tmp_path)
+    code = orchestrator.check()
+    assert code == 0
+
+
+def test_check_returns_nonzero_on_corrupt_feature_weights(tmp_path, monkeypatch):
+    (tmp_path / "learning").mkdir()
+    (tmp_path / "learning" / "feature_weights.json").write_text("{BROKEN", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    code = orchestrator.check()
+    assert code != 0
+
+
+def test_check_returns_nonzero_on_corrupt_price_params(tmp_path, monkeypatch):
+    (tmp_path / "learning").mkdir()
+    (tmp_path / "learning" / "price_params.json").write_text("{BROKEN", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    code = orchestrator.check()
+    assert code != 0
