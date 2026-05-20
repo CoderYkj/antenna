@@ -105,7 +105,7 @@ def run():
             r["name"]  = rt.get("name") or name_map.get(code, code)
 
             # 生成当日分时文字版
-            df_intraday = fetch_intraday_kline(code, period_min=15)
+            df_intraday = fetch_intraday_kline(code, period_min=10)
             prev_close = float(df.iloc[-1]["close"]) if not df.empty else None
             r["text_kline"] = text_intraday_kline(
                 df_intraday, code, name=r["name"], price_info=price_info
