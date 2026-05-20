@@ -237,16 +237,41 @@ def cached_codes() -> list:
 
 # ── 股票名称映射 ──────────────────────────────────────────────
 NAME_MAP_FILE = Path(__file__).parent / "name_map.json"
+_NAME_MAP_CACHE: dict = {}       # 进程内缓存
+_NAME_MAP_CACHE_TS: float = 0.0  # 最后加载时间
 
 
 def _load_name_map() -> dict:
-    """加载本地股票名称映射（code→name），24 小时内复用缓存。"""
+    """加载本地股票名称映射（code→name），进程内缓存 1 小时；文件缓存 24 小时。"""
     import json, time
+    global _NAME_MAP_CACHE, _NAME_MAP_CACHE_TS
+    now = time.time()
+    # 进程内缓存有效时直接返回
+    if _NAME_MAP_CACHE and now - _NAME_MAP_CACHE_TS < 3600:
+        return _NAME_MAP_CACHE
+    # 文件存在且 <24h，读文件
     if NAME_MAP_FILE.exists():
-        if time.time() - NAME_MAP_FILE.stat().st_mtime < 86400:
+        if now - NAME_MAP_FILE.stat().st_mtime < 86400:
             with open(NAME_MAP_FILE, encoding="utf-8") as f:
-                return json.load(f)
-    return _refresh_name_map()
+                _NAME_MAP_CACHE = json.load(f)
+            _NAME_MAP_CACHE_TS = now
+            return _NAME_MAP_CACHE
+    # 文件过期，尝试刷新；失败时 fallback 到旧文件
+    fresh = _refresh_name_map()
+    if fresh:
+        _NAME_MAP_CACHE = fresh
+        _NAME_MAP_CACHE_TS = now
+        return _NAME_MAP_CACHE
+    # akshare 刷新失败，降级读旧文件
+    if NAME_MAP_FILE.exists():
+        try:
+            with open(NAME_MAP_FILE, encoding="utf-8") as f:
+                _NAME_MAP_CACHE = json.load(f)
+            _NAME_MAP_CACHE_TS = now
+            return _NAME_MAP_CACHE
+        except Exception:
+            pass
+    return {}
 
 
 def _refresh_name_map() -> dict:
