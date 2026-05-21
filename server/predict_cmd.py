@@ -289,6 +289,12 @@ def cmd_news(code: str) -> dict:
         for title, date_str in neu_items[:10]:
             lines.append(_fmt_item(title, date_str))
 
+    try:
+        from learning.market_state import load_current_state as _lcs_news
+        lines.append(f"\n📍 当前市场状态：**{_lcs_news().get('current', 'range')}**")
+    except Exception:
+        pass
+
     card = {
         "config": {"wide_screen_mode": True},
         "header": {
@@ -1267,13 +1273,23 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
     # ── 构建飞书卡片 ──────────────────────────────────────
     elements = []
 
+    # 活跃特征数
+    _active_cnt_str = ""
+    try:
+        import json as _json, pathlib as _pl
+        _fw = _json.loads(_pl.Path("learning/feature_weights.json").read_text(encoding="utf-8"))
+        _active_cnt_str = f"　活跃特征 **{len(_fw.get('active', []))}**"
+    except Exception:
+        pass
+
     # 推荐清单（简洁表格）
     elements.append({
         "tag": "markdown",
         "content": (
             f"共扫描 **{total}** 只（{fail_count} 只跳过），"
             f"买入信号门槛前 **{buy_top_pct:.0%}**，展示涨概率最高 {top_n} 只。\n"
-            f"快照已写入 {pred_date} 预测记录。"
+            f"快照已写入 {pred_date} 预测记录。\n"
+            f"市场状态 **{_current_state}**{_active_cnt_str}"
         )
     })
     elements.append({"tag": "hr"})
@@ -2605,6 +2621,13 @@ def cmd_trend(code: str) -> dict:
         if sec:
             elements.append({"tag": "hr"})
             elements.append({"tag": "markdown", "content": sec})
+
+    try:
+        from learning.market_state import load_current_state as _lcs_trend
+        elements.append({"tag": "markdown",
+            "content": f"📍 当前市场状态：**{_lcs_trend().get('current', 'range')}**"})
+    except Exception:
+        pass
 
     card = {
         "config": {"wide_screen_mode": True},
