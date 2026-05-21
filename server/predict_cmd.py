@@ -1445,6 +1445,110 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
     return {"msg_type": "interactive", "content": json.dumps(card, ensure_ascii=False)}
 
 
+# ── 学习产物读取工具函数 ────────────────────────────────────────────────────
+
+def _load_learning_panel() -> str:
+    """读取 P1/P2/P3/P4 学习产物，返回 markdown 字符串；失败返回空串。"""
+    import json, pathlib
+    BASE = pathlib.Path("learning")
+    lines = ["**🔬 学习系统状态**"]
+    # P1
+    try:
+        ml = json.loads((BASE / "model_learner.json").read_text(encoding="utf-8"))
+        state = ml.get("current_state", "?")
+        thresh = ml.get("abs_threshold", "?")
+        cal_dt = ml.get("last_calibrated", "")[:10]
+        lines.append(f"P1 校准　状态 **{state}**　abs_threshold **{thresh}**　校准于 {cal_dt}")
+    except Exception:
+        pass
+    # P2
+    try:
+        tp = json.loads((BASE / "tactic_params.json").read_text(encoding="utf-8"))
+        cs = tp.get("current_state", "range")
+        params = tp.get("params", {}).get(cs, {})
+        parts = []
+        for tname, tkey in [("价值", "value"), ("成长", "growth"), ("龙头", "leader"), ("逆向", "contra")]:
+            prec = params.get(tkey, {}).get("precision")
+            if prec is not None:
+                parts.append(f"{tname} {prec:.0%}")
+        if parts:
+            lines.append(f"P2 战法　{' / '.join(parts)}（{cs}）")
+    except Exception:
+        pass
+    # P3
+    try:
+        fw = json.loads((BASE / "feature_weights.json").read_text(encoding="utf-8"))
+        active = fw.get("active", [])
+        last_upd = fw.get("last_updated", "")[:10]
+        lines.append(f"P3 特征　活跃 **{len(active)}** 列　剪枝于 {last_upd}")
+    except Exception:
+        pass
+    # P4
+    try:
+        pp = json.loads((BASE / "price_params.json").read_text(encoding="utf-8"))
+        from learning.market_state import load_current_state
+        cs2 = load_current_state().get("current", "range")
+        pp_s = pp.get(cs2, {})
+        sa = pp_s.get("short_atr_mult", "?")
+        sg = pp_s.get("short_gain_mult", "?")
+        lines.append(f"P4 价位　short_atr_mult **{sa}**　short_gain_mult **{sg}**（{cs2}）")
+    except Exception:
+        pass
+    return "\n".join(lines) if len(lines) > 1 else ""
+
+
+def _learning_context_line() -> str:
+    """生成单行学习上下文（失败返回空串）。"""
+    import json, pathlib
+    BASE = pathlib.Path("learning")
+    parts = []
+    state = "range"
+    try:
+        from learning.market_state import load_current_state
+        state = load_current_state().get("current", "range")
+        parts.append(f"市场 **{state}**")
+    except Exception:
+        pass
+    try:
+        ml = json.loads((BASE / "model_learner.json").read_text(encoding="utf-8"))
+        t = ml.get("abs_threshold", "?")
+        parts.append(f"校准门槛 **{t}**")
+    except Exception:
+        pass
+    try:
+        fw = json.loads((BASE / "feature_weights.json").read_text(encoding="utf-8"))
+        parts.append(f"活跃特征 **{len(fw.get('active', []))}**")
+    except Exception:
+        pass
+    try:
+        pp = json.loads((BASE / "price_params.json").read_text(encoding="utf-8"))
+        sa = pp.get(state, {}).get("short_atr_mult")
+        if sa is not None:
+            parts.append(f"ATR系数 **{sa}**")
+    except Exception:
+        pass
+    if not parts:
+        return ""
+    return "📐 学习参数　" + "　｜　".join(parts)
+
+
+def _tactic_precision_line(strategy_key: str) -> str:
+    """获取该战法在当前市场状态的精准率，返回一行文字；失败返回空串。"""
+    import json, pathlib
+    try:
+        from learning.market_state import load_current_state
+        state = load_current_state().get("current", "range")
+        tp = json.loads(pathlib.Path("learning/tactic_params.json").read_text(encoding="utf-8"))
+        params = tp.get("params", {}).get(state, {}).get(strategy_key, {})
+        prec = params.get("precision")
+        samp = params.get("samples", 0)
+        if prec is None:
+            return ""
+        return f"📊 战法精准率　{strategy_key} 在 {state} 市场 **{prec:.0%}**（{samp} 样本）"
+    except Exception:
+        return ""
+
+
 # ── 策略指令 ───────────────────────────────────────────────────────────────
 
 def cmd_strategy() -> dict:
@@ -1560,6 +1664,11 @@ def cmd_strategy() -> dict:
         {"tag": "hr"},
         {"tag": "markdown", "content": "\n".join(adaptive_lines)},
     ]
+
+    _lp = _load_learning_panel()
+    if _lp:
+        elements.append({"tag": "hr"})
+        elements.append({"tag": "markdown", "content": _lp})
 
     card = {
         "config": {"wide_screen_mode": True},
@@ -1933,6 +2042,11 @@ def _tactic_run(strategy: str, top_n: int, all_codes: list,
     elements = [{"tag": "markdown", "content": header_md}, {"tag": "hr"}]
     for row in rows:
         elements.append({"tag": "markdown", "content": row})
+
+    _tp_line = _tactic_precision_line(strategy)
+    if _tp_line:
+        elements.append({"tag": "hr"})
+        elements.append({"tag": "markdown", "content": _tp_line})
 
     card = {
         "config": {"wide_screen_mode": True},
