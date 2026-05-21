@@ -1174,8 +1174,10 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
     _s["last_scan_date"]    = _today()
     save_strategy(_s)
 
-    # 始终取涨概率最高的前 N 只（已按 rise_prob+momentum 降序排列）
-    top = results[:top_n]
+    # 只取 AI 双门槛买入信号的股票作为候选（已按 rise_prob+momentum 降序排列）
+    buy_results = [r for r in results if r.get("signal") == "买入"]
+    n_buy = len(buy_results)
+    top = buy_results[:top_n * 2]
 
     # 补充实时行情
     top_codes = [r["code"] for r in top]
@@ -1207,6 +1209,10 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
     # P2 D3:共振股调 rank_pct,重排 top 让共振股前移
     _apply_resonance_boost(top)
     top.sort(key=lambda r: float(r.get("global_rank_pct", 1.0)))
+
+    # 按战法层次过滤：tier1(共振≥2) 在前，tier2(单战法=1) 在后，0 战法不展示
+    tier1, tier2 = _tier_split(top)
+    top = (tier1 + tier2)[:top_n]
 
     # 获取热点行业数据
     try:
@@ -1293,13 +1299,28 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
     except Exception:
         pass
 
+    # 无战法认可股票时，返回灰色空推荐卡片
+    if not top:
+        _empty_card = {
+            "config": {"wide_screen_mode": True},
+            "header": {
+                "title": {"tag": "plain_text", "content": f"Antenna 推荐　{scan_date}"},
+                "template": "grey",
+            },
+            "elements": [{"tag": "markdown", "content": (
+                f"共扫描 **{total}** 只，AI 买入信号 **{n_buy}** 只。\n"
+                f"今日暂无战法认可的推荐股票，建议观望。\n"
+                f"市场状态 **{_current_state}**{_active_cnt_str}"
+            )}],
+        }
+        return {"msg_type": "interactive", "content": json.dumps(_empty_card, ensure_ascii=False)}
+
     # 推荐清单（简洁表格）
     elements.append({
         "tag": "markdown",
         "content": (
-            f"共扫描 **{total}** 只（{fail_count} 只跳过），"
-            f"买入信号门槛前 **{buy_top_pct:.0%}**，展示涨概率最高 {top_n} 只。\n"
-            f"快照已写入 {pred_date} 预测记录。\n"
+            f"共扫描 **{total}** 只，AI 买入信号 **{n_buy}** 只。\n"
+            f"战法筛选后推荐 **{len(top)}** 只（★共振 {len(tier1)} / ★单战法 {len(tier2)}）\n"
             f"市场状态 **{_current_state}**{_active_cnt_str}"
         )
     })
