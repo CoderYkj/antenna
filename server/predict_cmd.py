@@ -170,6 +170,21 @@ def cmd_quote(code: str) -> dict:
         )
         elements = [{"tag": "markdown", "content": summary}]
 
+    # 黑名单警告（如果该股在当前状态下被拉黑）
+    try:
+        from learning.blacklist import load_blacklist
+        from learning.market_state import load_current_state
+        _bl = load_blacklist()
+        _cs = load_current_state().get("current", "range")
+        if _bl.is_blocked(code, _cs):
+            elements.append({"tag": "hr"})
+            elements.append({"tag": "markdown",
+                "content": (f"⚠️ **黑名单提示**　{_stock_label(code)} 在当前 {_cs} 市场下"
+                            f"因近期连续错误预测已被系统拉黑，建议谨慎操作。")
+            })
+    except Exception:
+        pass
+
     card = {
         "config": {"wide_screen_mode": True},
         "header": {
@@ -503,6 +518,11 @@ def cmd_predict(code: str) -> dict:
     if trade_lines:
         elements.append({"tag": "hr"})
         elements.append({"tag": "markdown", "content": "**买卖建议**\n" + "\n".join(trade_lines)})
+
+    # 学习上下文
+    _lc = _learning_context_line()
+    if _lc:
+        elements.append({"tag": "markdown", "content": _lc})
 
     # 持仓建议
     elements.append({"tag": "hr"})
