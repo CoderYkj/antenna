@@ -253,3 +253,142 @@ def test_cmd_scan_bot_alt_fetch_failure_does_not_crash():
     args, kwargs = submitted_calls[0]
     alt_passed = args[1] if len(args) > 1 else kwargs.get("alt")
     assert alt_passed == {}, f"Expected empty dict on alt fetch failure, got {alt_passed!r}"
+
+
+# ── cmd_predict 单股 alt 注入 ────────────────────────────────
+
+def _build_predict_patches(code: str, alt_data: dict, alt_side_effect=None):
+    """返回 cmd_predict() 所需的 patch 列表。
+
+    alt_data: fetch_alt_features 正常返回时的值
+    alt_side_effect: 若非 None，fetch_alt_features 抛该异常（测试 fallback）
+    """
+    minimal_df = _make_minimal_df()
+    fake_cfg = {
+        "model": {"saved_dir": "models/saved"},
+    }
+    fake_strategy = {
+        "buy_top_pct": 0.10,
+        "last_thresh_buy": 0,
+        "last_thresh_watch": 0,
+        "last_scan_date": "",
+        "last_scan_total": 0,
+    }
+
+    if alt_side_effect is not None:
+        alt_patch = patch(
+            "data.alt_fetcher.fetch_alt_features",
+            side_effect=alt_side_effect,
+        )
+    else:
+        alt_patch = patch(
+            "data.alt_fetcher.fetch_alt_features",
+            return_value=alt_data,
+        )
+
+    return [
+        patch("server.predict_cmd._load_cfg",          return_value=fake_cfg),
+        patch("learning.optimizer.load_strategy",       return_value=fake_strategy),
+        patch("data.fetcher.fetch_stock_hist",          return_value=minimal_df),
+        patch("features.builder.build_features",        side_effect=lambda df, **kw: df),
+        patch("features.technical.get_active_feature_cols", return_value=["ma5", "rsi6"]),
+        patch("models.predictor.load_model",            return_value=MagicMock()),
+        patch("models.predictor.predict",               return_value={
+            "rise_prob": 0.65,
+            "signal": "买入",
+            "confidence": "高",
+            "self_rank_pct": 0.05,
+        }),
+        patch("features.analyser.analyse",              return_value="技术分析文本"),
+        patch("features.analyser.predict_range",        return_value={
+            "pred_high": 12.5, "pred_low": 10.5, "price": 11.0,
+            "pct": 0.5, "high": 11.5, "low": 10.5, "open": 10.8,
+        }),
+        patch("features.analyser.build_commentary",     return_value=("点评", "依据")),
+        patch("features.analyser.suggest_holding",      return_value=("短线", "理由")),
+        patch("features.analyser.suggest_trade_levels", return_value={}),
+        patch("features.analyser.text_intraday_kline",  return_value=""),
+        patch("data.fetcher.fetch_realtime_prices",     return_value={}),
+        patch("data.fetcher.fetch_intraday_kline",      return_value=None),
+        patch("learning.tracker.load_predictions",      return_value=[]),
+        alt_patch,
+    ]
+
+
+def test_cmd_predict_passes_non_empty_alt_to_build_features():
+    """cmd_predict 调用 build_features 时，alt kwarg 非空（非 None、非 {}）。"""
+    code = "000001"
+    fake_alt_dict = {"main_net_in_1d": 0.3, "main_net_in_5d": 0.1,
+                     "dragon_top_cnt_10d": 0.0, "sector_heat_rank": 0.4,
+                     "north_hold_chg_5d": 0.2}
+    alt_data = {code: fake_alt_dict}
+
+    captured_alt = []
+
+    def _fake_build_features(df, **kwargs):
+        captured_alt.append(kwargs.get("alt"))
+        return df
+
+    patches = _build_predict_patches(code, alt_data)
+    # override build_features patch to capture alt
+    patches = [
+        p for p in patches
+        if not (hasattr(p, "attribute") and p.attribute == "build_features")
+    ]
+
+    with ExitStack() as stack:
+        for p in patches:
+            stack.enter_context(p)
+        stack.enter_context(
+            patch("features.builder.build_features", side_effect=_fake_build_features)
+        )
+
+        from server import predict_cmd
+        import importlib
+        importlib.reload(predict_cmd)
+        predict_cmd.cmd_predict(code)
+
+    assert len(captured_alt) >= 1, "build_features should have been called"
+    alt_received = captured_alt[0]
+    assert alt_received is not None, "alt kwarg should not be None"
+    assert alt_received != {}, "alt kwarg should not be empty dict"
+    assert alt_received == fake_alt_dict, (
+        f"Expected alt={fake_alt_dict!r}, got {alt_received!r}"
+    )
+
+
+def test_cmd_predict_alt_fetch_failure_fallback():
+    """fetch_alt_features 失败时，cmd_predict 不崩溃，build_features 收到空 dict。"""
+    code = "000001"
+
+    captured_alt = []
+
+    def _fake_build_features(df, **kwargs):
+        captured_alt.append(kwargs.get("alt"))
+        return df
+
+    patches = _build_predict_patches(code, {}, alt_side_effect=RuntimeError("network"))
+    patches = [
+        p for p in patches
+        if not (hasattr(p, "attribute") and p.attribute == "build_features")
+    ]
+
+    with ExitStack() as stack:
+        for p in patches:
+            stack.enter_context(p)
+        stack.enter_context(
+            patch("features.builder.build_features", side_effect=_fake_build_features)
+        )
+
+        from server import predict_cmd
+        import importlib
+        importlib.reload(predict_cmd)
+        result = predict_cmd.cmd_predict(code)
+
+    # cmd_predict 不崩溃，返回正常结果
+    assert isinstance(result, (dict, str)), "cmd_predict should return dict or str"
+    # alt fallback 为空 dict
+    assert len(captured_alt) >= 1, "build_features should have been called"
+    assert captured_alt[0] == {}, (
+        f"Expected empty dict on alt failure, got {captured_alt[0]!r}"
+    )

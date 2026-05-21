@@ -84,6 +84,16 @@ def run():
     model    = load_model(model_dir)
     name_map = _load_name_map()
 
+    # 批量预取 alt_data（失败不阻断）
+    today_str = now.strftime("%Y-%m-%d")
+    alt_cache: dict = {}
+    try:
+        from data.alt_fetcher import fetch_alt_features
+        alt_cache = fetch_alt_features(codes, today_str)
+        print(f"[task_predict] alt_data 预取成功 {len(alt_cache)}/{len(codes)} 只")
+    except Exception as _alt_err:
+        print(f"[task_predict] alt_data 预取失败，继续无 alt 特征: {_alt_err}")
+
     # 批量获取所有自选股实时行情（一次请求）
     try:
         rt_prices = fetch_realtime_prices(codes)
@@ -96,7 +106,8 @@ def run():
     for code in codes:
         try:
             df = fetch_stock_hist(code, days=365)
-            df = build_features(df)
+            alt_dict = alt_cache.get(code, {})
+            df = build_features(df, alt=alt_dict)
             r = predict(df, active_feature_cols, model=model)
             last = df.iloc[-1].to_dict()
             r["reason"] = analyse(last)

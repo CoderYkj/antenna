@@ -104,7 +104,7 @@ def _build_patches(fake_active_cols_or_exc, fake_predict_fn):
         patch("data.fetcher.fetch_realtime_prices",      return_value={}),
         patch("data.fetcher.fetch_intraday_kline",       return_value=minimal_df),
         patch("data.fetcher._load_name_map",             return_value={}),
-        patch("features.builder.build_features",         side_effect=lambda df: df),
+        patch("features.builder.build_features",         side_effect=lambda df, **kw: df),
         gafc_patch,
         patch("features.analyser.analyse",               return_value="分析文本"),
         patch("features.analyser.predict_range",         return_value=_fake_price_info()),
@@ -112,6 +112,7 @@ def _build_patches(fake_active_cols_or_exc, fake_predict_fn):
         patch("models.predictor.predict",                side_effect=fake_predict_fn),
         patch("models.predictor.load_model",             return_value=MagicMock()),
         patch("notify.feishu.send_predict_results",      return_value=True),
+        patch("data.alt_fetcher.fetch_alt_features",     return_value={}),
     ]
 
 
@@ -168,4 +169,118 @@ def test_run_falls_back_to_FEATURE_COLS_on_exception():
     from features.technical import FEATURE_COLS
     assert captured_feature_cols[0] == FEATURE_COLS, (
         f"回退路径应用 FEATURE_COLS，实际={captured_feature_cols[0]!r}"
+    )
+
+
+# ── alt 注入测试 ─────────────────────────────────────────────
+
+def _build_patches_with_alt(fake_active_cols_or_exc, fake_predict_fn, fake_alt_map=None, alt_side_effect=None):
+    """扩展 _build_patches，额外注入 fetch_alt_features mock。"""
+    base = _build_patches(fake_active_cols_or_exc, fake_predict_fn)
+
+    if alt_side_effect is not None:
+        alt_patch = patch(
+            "data.alt_fetcher.fetch_alt_features",
+            side_effect=alt_side_effect,
+        )
+    else:
+        alt_patch = patch(
+            "data.alt_fetcher.fetch_alt_features",
+            return_value=fake_alt_map or {},
+        )
+
+    return base + [alt_patch]
+
+
+def test_run_passes_alt_to_build_features():
+    """run() 在调用 build_features 时应传 alt kwarg，且该 alt 来自 fetch_alt_features。"""
+    code = "000001"
+    fake_alt_dict = {
+        "main_net_in_1d":     0.3,
+        "main_net_in_5d":     0.1,
+        "dragon_top_cnt_10d": 0.0,
+        "sector_heat_rank":   0.4,
+        "north_hold_chg_5d":  0.2,
+    }
+    fake_alt_map = {code: fake_alt_dict}
+
+    captured_alt: list = []
+
+    def _fake_build_features(df, **kwargs):
+        captured_alt.append(kwargs.get("alt"))
+        return df
+
+    def _fake_predict(df, feature_cols, model=None):
+        return _fake_predict_result()
+
+    import importlib
+    import scripts.task_predict as tp
+    importlib.reload(tp)
+
+    patches = _build_patches_with_alt(
+        _FEATURE_COLS_PRUNED[:],
+        _fake_predict,
+        fake_alt_map=fake_alt_map,
+    )
+    # 替换 build_features patch 为能捕获 alt 的版本
+    patches = [
+        p for p in patches
+        if not (hasattr(p, "attribute") and p.attribute == "build_features")
+    ]
+
+    with ExitStack() as stack:
+        for p in patches:
+            stack.enter_context(p)
+        stack.enter_context(
+            patch("features.builder.build_features", side_effect=_fake_build_features)
+        )
+
+        tp.run()
+
+    assert len(captured_alt) >= 1, "build_features 应被调用至少一次"
+    alt_received = captured_alt[0]
+    assert alt_received is not None, "alt kwarg 不应为 None"
+    assert alt_received != {}, "alt kwarg 不应为空 dict"
+    assert alt_received == fake_alt_dict, (
+        f"期望 alt={fake_alt_dict!r}, 实际={alt_received!r}"
+    )
+
+
+def test_run_alt_fetch_failure_does_not_crash():
+    """fetch_alt_features 失败时 run() 不崩溃，build_features 收到空 dict。"""
+    captured_alt: list = []
+
+    def _fake_build_features(df, **kwargs):
+        captured_alt.append(kwargs.get("alt"))
+        return df
+
+    def _fake_predict(df, feature_cols, model=None):
+        return _fake_predict_result()
+
+    import importlib
+    import scripts.task_predict as tp
+    importlib.reload(tp)
+
+    patches = _build_patches_with_alt(
+        _FEATURE_COLS_PRUNED[:],
+        _fake_predict,
+        alt_side_effect=RuntimeError("network error"),
+    )
+    patches = [
+        p for p in patches
+        if not (hasattr(p, "attribute") and p.attribute == "build_features")
+    ]
+
+    with ExitStack() as stack:
+        for p in patches:
+            stack.enter_context(p)
+        stack.enter_context(
+            patch("features.builder.build_features", side_effect=_fake_build_features)
+        )
+
+        tp.run()  # should not raise
+
+    assert len(captured_alt) >= 1, "build_features 应被调用"
+    assert captured_alt[0] == {}, (
+        f"alt fetch 失败时应回退到空 dict, 实际={captured_alt[0]!r}"
     )

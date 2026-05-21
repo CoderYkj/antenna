@@ -307,8 +307,18 @@ def cmd_predict(code: str) -> dict:
     except Exception as e:
         return f"「{_stock_label(code)}」数据获取失败：{e}"
 
+    # 拉取单股 alt_data（失败降级为空 dict，不崩溃）
+    today_str = _today()
+    alt_dict: dict = {}
     try:
-        df = build_features(df)
+        from data.alt_fetcher import fetch_alt_features
+        alt_cache = fetch_alt_features([code], today_str)
+        alt_dict = alt_cache.get(code, {})
+    except Exception as _alt_err:
+        log.warning(f"[cmd_predict] alt_data fetch failed for {code}, proceeding without alt features: {_alt_err}")
+
+    try:
+        df = build_features(df, alt=alt_dict)
     except Exception as e:
         return f"「{_stock_label(code)}」特征计算失败：{e}"
 
