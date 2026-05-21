@@ -68,11 +68,19 @@ def run():
 
     from data.fetcher import fetch_stock_hist, fetch_realtime_prices, fetch_intraday_kline, _load_name_map
     from features.builder import build_features
-    from features.technical import FEATURE_COLS
+    from features.technical import FEATURE_COLS, get_active_feature_cols
     from features.analyser import analyse, predict_range, text_intraday_kline
     from models.predictor import predict, load_model
 
-    print(f"[task_predict] {now.strftime('%H:%M')} 预测自选股 {len(codes)} 只 ...")
+    # P3 学习系统每周更新 feature_weights.json；用激活列表，回退全量特征
+    try:
+        active_feature_cols = get_active_feature_cols()
+    except Exception as e:
+        print(f"[task_predict] get_active_feature_cols 失败，回退 FEATURE_COLS: {e}")
+        active_feature_cols = FEATURE_COLS
+
+    print(f"[task_predict] {now.strftime('%H:%M')} 预测自选股 {len(codes)} 只 "
+          f"(特征数={len(active_feature_cols)}) ...")
     model    = load_model(model_dir)
     name_map = _load_name_map()
 
@@ -89,7 +97,7 @@ def run():
         try:
             df = fetch_stock_hist(code, days=365)
             df = build_features(df)
-            r = predict(df, FEATURE_COLS, model=model)
+            r = predict(df, active_feature_cols, model=model)
             last = df.iloc[-1].to_dict()
             r["reason"] = analyse(last)
 
