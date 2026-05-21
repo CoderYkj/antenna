@@ -2,12 +2,12 @@
 
 基于 LightGBM + isotonic 概率校准的 A 股交易辅助系统，提供：
 
-- 🤖 **AI 选股**：全市场扫描 → 双门槛信号（分位 + 校准概率）
-- 📊 **四大战法**：价值 / 成长 / 龙头 / 逆向，财务 + 技术双重筛选
-- 📈 **双周期价位**：每只候选股自动生成短线 1-5 日 + 长线 2-4 周买卖止损位
-- 🧠 **自主学习**：每日按市场状态拟合 isotonic 校准器，把模型概率校准到真实命中率
-- 💬 **飞书机器人**：双向交互、自然语言指令、AI 闲聊兜底
-- ♻️ **Walk-Forward 回测** + **策略自优化**（精准率监控 → 选股门槛动态调整）
+- **AI 选股**：全市场扫描 → 双门槛信号（分位 + 校准概率）
+- **四大战法**：价值 / 成长 / 龙头 / 逆向，财务 + 技术双重筛选
+- **双周期价位**：每只候选股自动生成短线 1-5 日 + 长线 2-4 周买卖止损位（ATR/振幅系数自学习）
+- **自主学习**：6 模块编排器每日/每周自动运行，覆盖概率校准、战法参数、特征剪枝、价位优化
+- **飞书机器人**：双向交互、自然语言指令、AI 闲聊兜底
+- **Walk-Forward 回测** + **策略自优化**（精准率监控 → 选股门槛动态调整）
 
 ---
 
@@ -37,16 +37,19 @@ antenna/
 ├── requirements.txt
 │
 ├── data/
-│   ├── fetcher.py                 # 行情数据拉取（akshare + 新浪实时）
+│   ├── fetcher.py                 # 行情数据拉取（akshare + 新浪实时，name_map 进程内缓存）
+│   ├── alt_fetcher.py             # ★ P3 alt 数据（主力净流入/龙虎榜/北向资金），缓存到 cache/alt/
 │   ├── universe.py                # 股票池管理
-│   ├── name_map.json              # 代码 → 名称映射
+│   ├── name_map.json              # 代码 → 名称映射（24h 文件缓存 + 1h 进程内缓存）
 │   ├── sector_map.json            # 代码 → 行业映射
-│   └── cache/                     # Parquet 缓存（自动）
+│   └── cache/
+│       ├── *.parquet              # 行情 Parquet 缓存（自动）
+│       └── alt/                   # ★ P3 alt 特征日缓存（YYYY-MM-DD.parquet）
 │
 ├── features/
-│   ├── builder.py                 # 特征工程流水线
-│   ├── technical.py               # 25 个技术指标
-│   ├── analyser.py                # 技术分析描述、双周期价位、新闻抓取
+│   ├── builder.py                 # 特征工程流水线（支持注入 alt 特征）
+│   ├── technical.py               # 27 个技术指标 + get_active_feature_cols()
+│   ├── analyser.py                # 技术分析描述、双周期价位（动态 ATR/振幅系数）、新闻抓取
 │   └── fundamental.py             # 财务报表解构与评分
 │
 ├── models/
@@ -54,15 +57,15 @@ antenna/
 │   ├── predictor.py               # 推理 + 全市场信号双门槛分配
 │   └── saved/                     # 模型 pkl + calibrator pkl（gitignored）
 │
-├── learning/                      # 学习系统(P0/P1/P2 + 横向黑名单)
-│   ├── tracker.py                 # pred/outcome JSONL 归档（含 scene 标签）
-│   ├── outcome_metrics.py         # hit_tier(miss/weak/good/great) + 5 日指标
-│   ├── market_state.py            # 大盘状态打标(bull/bear/range)，3 日防抖
-│   ├── orchestrator.py            # 瘦编排器，模块失败隔离
+├── learning/                      # 学习系统（P0 / P1 / P2 / P3 / P4 + 横向黑名单）
+│   ├── orchestrator.py            # ★ 编排器：6 模块依赖调度 + check() 语义校验
+│   ├── tracker.py                 # pred / outcome JSONL 归档（含 scene / market_state 标签）
+│   ├── outcome_metrics.py         # hit_tier（miss / weak / good / great）+ 5 日指标
+│   ├── market_state.py            # 大盘状态打标（bull / bear / range），3 日防抖
 │   ├── feedback_io.py             # 原子写 + 7 份历史快照
 │   ├── alerts.py                  # 飞书 + JSONL 三路告警
 │   ├── optimizer.py               # buy_top_pct 日级自动调参
-│   ├── scene_bucket.py            # 按 scene/state 分桶工具
+│   ├── scene_bucket.py            # 按 scene / state 分桶工具
 │   ├── backtest_history.py        # Walk-Forward 结果存档
 │   ├── model_learner.py           # ★ P1 isotonic 校准 + abs_threshold 自校 + 加权重训
 │   ├── model_learner.yaml         # P1 可配置参数
@@ -70,36 +73,42 @@ antenna/
 │   ├── tactic_learner.yaml        # P2 defaults / bear override / bounds / step
 │   ├── blacklist.py               # ★ 横向黑名单：连错股票自动拉黑 30 天
 │   ├── blacklist.yaml             # streak_threshold / block_days / per_state_threshold
+│   ├── feature_learner.py         # ★ P3 Permutation Importance 特征剪枝 + alt IC 筛选
+│   ├── feature_learner.yaml       # P3 ic_threshold / min_samples / decay 参数
+│   ├── price_learner.py           # ★ P4 ATR/振幅系数网格搜索，按 market_state 分桶
+│   ├── price_learner.yaml         # P4 网格范围 / cold_start 默认值
 │   ├── strategy.json              # 当前选股策略状态（自动维护）
 │   ├── model_learner.json         # P1 校准状态 + threshold 历史
 │   ├── tactic_params.json         # P2 战法参数 + 权重（自动维护）
 │   ├── blacklist.json             # 当前黑名单条目（自动维护）
+│   ├── feature_weights.json       # ★ P3 特征重要性 + active 列列表（自动维护）
+│   ├── price_params.json          # ★ P4 各状态最优 ATR/振幅系数（自动维护）
 │   ├── market_state.json          # 大盘状态历史（含 365 天容量）
 │   └── persona.txt                # AI 闲聊人设
 │
 ├── server/
 │   ├── feishu_poll.py             # 飞书轮询（每 5s，并发指令支持）
 │   ├── commands.py                # 指令词集合 + 路由
-│   ├── predict_cmd.py             # 全部飞书指令执行体（含 cmd_learn）
-│   ├── ai_reason.py               # ★ P2 LLM 深度推荐理由（Qwen3→Claude Haiku 三级降级）
+│   ├── predict_cmd.py             # 全部飞书指令执行体（含 alt_data 注入）
+│   ├── ai_reason.py               # ★ P2 LLM 深度推荐理由（Qwen3 → Claude Haiku 三级降级）
 │   ├── watchlist.py               # 自选股管理
 │   ├── style_learner.py           # 风格采集 → persona.txt
 │   ├── feishu_push.py             # 主动推送
-│   └── pm2_monitor.py             # PM2 状态监控面板
+│   └── pm2_monitor.py             # PM2 状态监控面板（Flask + Basic Auth）
 │
 ├── notify/
 │   └── feishu.py                  # Webhook 单向推送
 │
 ├── scripts/
-│   ├── backfill_hit_tier.py       # ★ P1 历史 hit_tier 批量回填（幂等）
-│   ├── backfill_market_state.py   # ★ P1 沪深 300 历史回放
+│   ├── backfill_hit_tier.py       # P1 历史 hit_tier 批量回填（幂等）
+│   ├── backfill_market_state.py   # P1 沪深 300 历史回放
 │   ├── replay_learn.py            # 学习系统回放 / P1 验收
-│   ├── task_scan.py               # 定时扫描
-│   ├── task_predict.py            # 盘中预测
+│   ├── check_alt_ic.py            # ★ P3 alt 特征 IC 有效性离线验证
+│   ├── task_scan.py               # 定时扫描（含 alt_data 批量拉取）
+│   ├── task_predict.py            # 盘中预测（动态特征列 + alt_data 注入）
 │   ├── task_daily_review.py       # 收盘复盘
 │   ├── task_noon_review.py        # 午间复盘
 │   ├── task_train.py              # 定时训练
-│   ├── run_train_weekly.bat       # ★ P1 周日 20:00 加权重训
 │   ├── run_*.bat                  # 任务计划入口
 │   └── setup_tasks.ps1            # Windows 任务计划一键注册
 │
@@ -156,6 +165,13 @@ pm2 save                          # 持久化进程列表，重启系统后自�
 
 # 或注册为 Windows 任务计划（无 PM2 时的替代方案）
 powershell -File scripts/setup_tasks.ps1
+```
+
+### 6. 触发首次学习
+
+```bash
+python cli.py learn          # 运行全部 6 个学习模块
+python cli.py learn --check  # 验证产物 JSON 合法性（含语义校验）
 ```
 
 ---
@@ -248,7 +264,7 @@ python cli.py <subcommand> [options]
 
 | 指令 | 示例 | 说明 |
 |------|------|------|
-| `学习 (日期)` | `学习` / `学习 2026-04-29` | 跑 market_state + model_learner 编排器 |
+| `学习 (日期)` | `学习` / `学习 2026-04-29` | 跑全部 6 个学习模块 |
 | `学习 dry-run` | `学习 演练` | 演练，不写盘 |
 | `策略` | `策略` | 当前选股门槛、精准率、abs_threshold |
 
@@ -290,8 +306,10 @@ No.1 名称（代码）　方向　综合评分 9.5
 
 | 周期 | 买入 | 止盈 | 止损 |
 |------|------|------|------|
-| 短线（1-5 日） | MA5 / 布林下轨 | 布林上轨 / 预测高位 | ATR×1.5 或 2% |
-| 长线（2-4 周） | MA20 | MA60 / 振幅×3 | MA60 下方 5% |
+| 短线（1-5 日） | MA5 / 布林下轨 | 布林上轨 / 预测高位 | ATR×系数 或 2%（系数由 P4 学习） |
+| 长线（2-4 周） | MA20 | MA60 / 振幅×系数 | MA60 下方（系数由 P4 学习） |
+
+止损/止盈系数由 `price_learner`（P4）每周日网格搜索最优值，按 bull/bear/range 三状态分别存储。
 
 ### 战法共振
 
@@ -306,16 +324,16 @@ No.1 名称（代码）　方向　综合评分 9.5
 
 ## 学习系统 (Learning)
 
-系统分阶段升级"自主学习"能力，由飞书 `学习` 指令、定时任务或 `cli.py learn` 触发。
+系统分阶段升级"自主学习"能力，由飞书 `学习` 指令、定时任务或 `cli.py learn` 触发。编排器 `orchestrator.py` 按依赖顺序运行 6 个模块，任一模块失败不影响其他模块。
 
 ### P0 — 地基层（✅ 已上线）
 
 | 模块 | 职责 |
 |------|------|
 | `learning/market_state.py` | 大盘状态打标（bull/bear/range），3 日防抖 |
-| `learning/tracker.py` | pred / outcome JSONL 归档，含 scene 场景标签 |
+| `learning/tracker.py` | pred / outcome JSONL 归档，含 scene / market_state 场景标签 |
 | `learning/outcome_metrics.py` | hit_tier（miss / weak / good / great）+ 5 日指标 |
-| `learning/orchestrator.py` | 瘦编排器，模块失败隔离，dry-run 支持 |
+| `learning/orchestrator.py` | 编排器：6 模块依赖调度，模块失败隔离，dry-run 支持，check() 语义校验 |
 | `learning/optimizer.py` | 精准率监控 + `buy_top_pct` 日级自动调参 |
 | `learning/feedback_io.py` | 原子写 + 7 份历史快照 |
 | `learning/alerts.py` | 飞书 + JSONL 三路告警 |
@@ -333,6 +351,15 @@ No.1 名称（代码）　方向　综合评分 9.5
 | `scripts/backfill_market_state.py` | 沪深 300 历史回放，重塑 200+ 天状态序列 |
 | `scripts/replay_learn.py --with-p1` | 198 天验收：baseline vs P1 精准率 + Brier 对比 |
 
+**实测效果**（最近 27 天 range 市场）：
+
+| 指标 | 基线 | P1 | Δ | 硬指标 |
+|------|------|----|---|--------|
+| 买入精准率 | 21.66% | **37.50%** | +15.84pt | ≥ +2pt ✅ |
+| Mean Brier | 0.234 | 0.168 | ratio 0.719 | ≤ 0.95 ✅ |
+
+P1 的核心价值是**把用户看到的概率校准到真实命中率**——避免"模型说 70% 实际只中 30%"的过度乐观。
+
 ### P2 — 战法层（✅ 已上线）
 
 **目标**：4 战法阈值自适应 + 战法权重学习 + LLM 深度推荐理由。
@@ -342,51 +369,50 @@ No.1 名称（代码）　方向　综合评分 9.5
 | `learning/tactic_learner.py` | 4 战法 × 3 状态 = 12 桶独立统计 90 日精准率；阈值按 direction 标记微调；权重 = 精准率归一化 |
 | `learning/tactic_learner.yaml` | defaults / bear override / bounds / step / evaluation / weights |
 | `server/predict_cmd._enrich_tactic_scores` | 读 `tactic_params.json[state]` 替代硬编码阈值 |
-| `server/predict_cmd._apply_resonance_boost` | 共振股(≥2 战法命中)调 `global_rank_pct`,不动 `rise_prob_cal` |
-| `server/ai_reason.py` | Qwen3 → Claude Haiku → None 三级降级；24h 缓存；日封顶 50 |
+| `server/predict_cmd._apply_resonance_boost` | 共振股（≥2 战法命中）调 `global_rank_pct`，不动 `rise_prob_cal` |
+| `server/ai_reason.py` | Qwen3 → Claude Haiku → None 三级降级；24h 缓存；日封顶 50 次 |
 
-**P2 关键设计决策**(详见 [spec](docs/superpowers/specs/2026-05-09-antenna-learning-p2-tactic-layer-design.md))：
+**关键设计决策**：
+- **共振机制**：不动 `rise_prob_cal`（保留 calibrator 真实命中率承诺），改为调整 `global_rank_pct`
+- **bear 桶兜底**：history bear=0 天时，`defaults_bear_override` 手工调严（ROE/负债要求更高）
+- **阈值方向**：每阈值附 `direction: tighten_up / tighten_down`，修复旧版对 max 类阈值方向错误的 bug
 
-- **D3 共振机制**：不动 `rise_prob_cal`（保留 calibrator 真实命中率承诺），改为调整 `global_rank_pct`
-- **D4 bear 桶兜底**：当前 history bear=0 天，`defaults_bear_override` 手工调严（ROE/负债要求更高）
-- **D5 阈值收严方向**：每阈值附 `direction: tighten_up / tighten_down`，修复旧版"全部 +step"对 max 类阈值方向错误的 bug
+### P3 — 特征层（✅ 已上线）
 
-**成本**：ai_reason 预期 0.5 元/月（缓存命中 ≥50%），日调用硬封顶 50 次。
+**目标**：动态特征剪枝（淘汰无 IC 特征）+ alt_data 补充外部信号。
 
-### P3/P4 — 路线图（⏳ 未启动）
+| 组件 | 职责 |
+|------|------|
+| `data/alt_fetcher.py` | 每日拉取 5 个 alt 特征，缓存到 `data/cache/alt/YYYY-MM-DD.parquet` |
+| `features/builder.py` | `build_features(df, alt=None)` 支持注入 alt 特征 |
+| `features/technical.py` | `get_active_feature_cols()` 读 `feature_weights.json` 返回剪枝后的列列表 |
+| `learning/feature_learner.py` | Permutation Importance 评估所有特征，IC < 0.02 或 8 周连续末位的列移出 active |
+| `learning/feature_learner.yaml` | ic_threshold / min_samples / decay 参数 |
+| `scripts/check_alt_ic.py` | 离线验证 alt 特征 IC 分布（`python scripts/check_alt_ic.py --days 30`） |
 
-**P1 投产流程**：
+**5 个 alt 特征**：
 
-```bash
-# 1. 一次性回填（幂等，可重复执行）
-python scripts/backfill_hit_tier.py
-python scripts/backfill_market_state.py
+| 特征 | 来源 | 说明 |
+|------|------|------|
+| `main_net_in_1d` | akshare 主力净流入 | 当日主力净买入额 |
+| `main_net_in_5d` | akshare 主力净流入 | 近 5 日主力净买入额 |
+| `dragon_top_cnt_10d` | akshare 龙虎榜 | 近 10 日上榜次数 |
+| `sector_heat_rank` | akshare 行业热度 | 所属行业热度排名（归一化） |
+| `north_hold_chg_5d` | akshare 北向持仓 | 近 5 日北向持仓变化 |
 
-# 2. 首次触发
-python cli.py learn          # 生成 learning/model_learner.json
-python cli.py learn --check  # 验证学习产物 JSON 合法
+alt 特征在扫描（`cmd_scan_bot`）、单股预测（`cmd_predict`）、盘中定时（`task_predict`）三条路径均已注入。
 
-# 3. 加权重训（默认日级不触发，由 Antenna-WeeklyTrain 周日 20:00 运行）
-python cli.py train --weighted
+### P4 — 价位层（✅ 已上线）
 
-# 4. 回放验收
-python scripts/replay_learn.py --with-p1 --abs-threshold 0.30
-```
+**目标**：止损/止盈系数不再硬编码，由历史命中率数据网格搜索最优值。
 
-**实测效果**（最近 27 天 range 市场）：
+| 组件 | 职责 |
+|------|------|
+| `learning/price_learner.py` | 4 参数（short_atr_mult / short_gain_mult / long_amp_mult / long_ma60_buffer）× 3 状态网格搜索 |
+| `learning/price_learner.yaml` | 网格范围 + cold_start 默认值 |
+| `features/analyser.suggest_dual_period_trades()` | 读 `price_params.json[state]` 动态加载系数，fallback 到 yaml 默认值 |
 
-| 指标 | 基线 | P1 | Δ | 硬指标 |
-|------|------|----|---|--------|
-| 买入精准率 | 21.66% | **37.50%** | +15.84pt | ≥ +2pt ✅ |
-| Mean Brier | 0.234 | 0.168 | ratio 0.719 | ≤ 0.95 ✅ |
-| Calibrator 拟合率 | — | 100% | — | — |
-
-P1 的核心价值是**把用户看到的概率校准到真实命中率**——避免"模型说 70% 实际只中 30%"的过度乐观。
-
-### P3/P4 — 路线图（⏳ 未启动）
-
-- **P3 特征层**：`feature_learner`（Permutation Importance + 8 周淘汰）+ `alt_data`（主力净流入/龙虎榜/北向资金）
-- **P4 价位层**：`price_learner`（ATR / 振幅系数网格搜索）
+网格搜索目标函数：`(止盈命中次数 − 止损触发次数) / 样本数`，每周日按 bull/bear/range 分别寻优。
 
 ### 横向 — 黑名单（✅ 已上线）
 
@@ -397,6 +423,29 @@ P1 的核心价值是**把用户看到的概率校准到真实命中率**——�
 | `server/predict_cmd.cmd_scan_bot` | `assign_global_signals` 之前过滤黑名单股票 |
 | **白名单 override** | watchlist 内的自选股永不参与拉黑判定 |
 | **自动过期** | 编排器每次跑都清理 `expires < today` 条目 |
+
+### 投产流程
+
+```bash
+# 一次性回填（幂等，可重复执行）
+python scripts/backfill_hit_tier.py
+python scripts/backfill_market_state.py
+
+# 首次触发全量学习
+python cli.py learn
+
+# 验证产物合法性（含 feature_weights.json active 列语义校验）
+python cli.py learn --check
+
+# 加权重训（由 Antenna-WeeklyTrain 周日 20:00 自动运行）
+python cli.py train --weighted
+
+# 验收回放
+python scripts/replay_learn.py --with-p1 --abs-threshold 0.30
+
+# 验证 alt 特征 IC（积累 10+ 交易日后运行）
+python scripts/check_alt_ic.py
+```
 
 ---
 
@@ -431,7 +480,7 @@ P1 在此之上追加 `abs_threshold`（绝对概率门槛，月度自校），�
 npm install -g pm2
 ```
 
-### ecosystem.config.cjs 进程清单
+### 进程清单（ecosystem.config.cjs）
 
 | 进程名 | 启动脚本 | 说明 |
 |--------|---------|------|
@@ -472,7 +521,7 @@ logs/pm2-monitor-out.log   # pm2-monitor 标准输出
 logs/pm2-monitor-error.log # pm2-monitor 错误
 ```
 
-### Web 监控面板（pm2-monitor）
+### Web 监控面板
 
 `server/pm2_monitor.py` 提供 Basic Auth 保护的 Web 面板，支持查看进程状态、Restart / Stop / Start 操作、查看最近日志。
 
@@ -489,8 +538,6 @@ pm2_monitor:
 
 面板地址：`http://<host>:9615`（每 10 秒自动刷新）。健康检查端点（无鉴权）：`http://<host>:9615/healthz`。
 
-> **注意**：`password` 未配置时 pm2-monitor 会拒绝启动，防止面板裸奔。
-
 ---
 
 ## 定时任务
@@ -500,13 +547,13 @@ pm2_monitor:
 | 任务 | 时间 | 功能 |
 |------|------|------|
 | `Antenna-Train` | 每日 09:00 | 重训练模型 |
-| `Antenna-Scan` | 工作日 09:15 | 全市场扫描推送 |
-| `Antenna-Predict-AM` | 工作日 09:30 起每 15 min（135 min） | 上午盘中预测 |
-| `Antenna-Predict-PM` | 工作日 13:00 起每 15 min（135 min） | 下午盘中预测 |
+| `Antenna-Scan` | 工作日 09:15 | 全市场扫描推送（含 alt_data） |
+| `Antenna-Predict-AM` | 工作日 09:30 起每 10 min | 上午盘中预测（动态特征列 + alt） |
+| `Antenna-Predict-PM` | 工作日 13:00 起每 10 min | 下午盘中预测 |
 | `Antenna-Noon-Review` | 工作日 11:32 | 午间复盘 |
 | `Antenna-Daily-Review` | 工作日 15:32 | 收盘复盘 + 策略调整 |
-| `Antenna-WeeklyTrain` | **周日 20:00** | ★ P1 加权重训 |
-| `Antenna-LearnWeekly` | **周日 02:30** | ★ P3/P4 学习编排（特征剪枝 + 价位网格搜索） |
+| `Antenna-WeeklyTrain` | **周日 20:00** | P1 加权重训 |
+| `Antenna-LearnWeekly` | **周日 02:30** | P3/P4 学习编排（特征剪枝 + 价位网格搜索） |
 
 ```powershell
 # 注册所有任务
@@ -548,13 +595,14 @@ python cli.py style              # 真实写入
 
 ## 技术栈
 
-- **数据**：akshare（A 股行情 / 财报）+ 新浪 HQ API（实时报价）
-- **特征**：pandas / numpy / pandas_ta（25 个技术指标）
-- **模型**：LightGBM 4.x（二分类）+ scikit-learn IsotonicRegression（概率校准）
+- **数据**：akshare（A 股行情 / 财报 / alt_data）+ 新浪 HQ API（实时报价）
+- **特征**：pandas / numpy / pandas_ta（27 个技术指标 + 5 个 alt 特征）
+- **模型**：LightGBM 4.x（二分类）+ scikit-learn IsotonicRegression（概率校准）+ Permutation Importance（P3 特征剪枝）
 - **配置**：PyYAML
 - **机器人**：requests（飞书 Open Platform）
 - **进程管理**：PM2（Node.js）+ Windows 任务计划
-- **测试**：pytest + pytest-cov（200+ 用例覆盖学习系统全链路）
+- **存储**：Parquet（行情缓存 + alt 缓存）+ JSONL（pred / outcome 归档）
+- **测试**：pytest（384 用例，覆盖学习系统全链路）
 
 ---
 
