@@ -285,6 +285,38 @@ def send_train_complete(webhook_url: str, elapsed_seconds: float = 0) -> bool:
 send_train_done = send_train_complete   # 兼容 task_train.py
 
 
+def send_learn_complete(
+    webhook_url: str,
+    results: dict,
+    elapsed_seconds: float = 0,
+) -> bool:
+    """学习编排完成后推送各模块状态汇总。"""
+    if not webhook_url:
+        return False
+
+    _STATUS_ICON = {"ok": "✅", "failed": "❌", "skipped": "⏭", "dry_run": "🔍"}
+    date_str = datetime.now().strftime("%Y-%m-%d %H:%M")
+    elapsed  = f"{elapsed_seconds:.0f}s" if elapsed_seconds else ""
+
+    ok      = sum(1 for r in results.values() if r["status"] == "ok")
+    failed  = sum(1 for r in results.values() if r["status"] == "failed")
+
+    header = f"{'❌' if failed else '✅'} Antenna 学习完成  {date_str}"
+    if elapsed:
+        header += f"  耗时 {elapsed}"
+
+    summary = f"ok={ok}  failed={failed}  skipped={sum(1 for r in results.values() if r['status'] == 'skipped')}"
+
+    lines = [header, summary, ""]
+    for name, r in results.items():
+        icon  = _STATUS_ICON.get(r["status"], "❓")
+        error = f"  → {r['error']}" if r["status"] == "failed" and r.get("error") else ""
+        lines.append(f"{icon} {name}{error}")
+
+    payload = {"msg_type": "text", "content": {"text": "\n".join(lines)}}
+    return _post(webhook_url, payload)
+
+
 def send_text(webhook_url: str, text: str) -> bool:
     """发送纯文本消息(学习系统告警用)。"""
     if not webhook_url:

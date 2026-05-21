@@ -293,6 +293,7 @@ def cmd_learn(args, config):
       python cli.py learn --dry-run
       python cli.py learn --check        # 仅做自检(不运行)
     """
+    import time
     from datetime import datetime
     from learning import orchestrator
 
@@ -302,7 +303,9 @@ def cmd_learn(args, config):
     date_str = args.date or datetime.now().strftime("%Y-%m-%d")
     print(f"[learn] 执行日期: {date_str}{' (dry-run)' if args.dry_run else ''}")
 
+    t0 = time.time()
     results = orchestrator.run_all(date_str=date_str, dry_run=args.dry_run)
+    elapsed = time.time() - t0
 
     ok      = sum(1 for r in results.values() if r["status"] == "ok")
     failed  = sum(1 for r in results.values() if r["status"] == "failed")
@@ -314,6 +317,14 @@ def cmd_learn(args, config):
         print(f"  - {name}: {r['status']}")
         if r["status"] == "failed":
             print(f"    error: {r['error']}")
+
+    if not args.dry_run:
+        try:
+            from notify.feishu import send_learn_complete
+            webhook_url = config.get("feishu", {}).get("webhook_url", "")
+            send_learn_complete(webhook_url, results, elapsed)
+        except Exception as _e:
+            print(f"[learn] 飞书通知失败（忽略）: {_e}")
 
     sys.exit(1 if failed else 0)
 
