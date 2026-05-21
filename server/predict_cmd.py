@@ -981,6 +981,17 @@ def _apply_resonance_boost(results: list) -> list:
     return results
 
 
+def _tier_split(enriched: list) -> tuple[list, list]:
+    """按战法认可程度分层。
+    tier1: tactic_resonance >= 2（共振）
+    tier2: tactic_resonance == 1（单战法）
+    0 战法命中的不返回。
+    """
+    tier1 = [r for r in enriched if r.get("tactic_resonance", 0) >= 2]
+    tier2 = [r for r in enriched if r.get("tactic_resonance", 0) == 1]
+    return tier1, tier2
+
+
 # ── P2 ai_reason 集成辅助 ────────────────────────────────
 
 def _build_ai_reason_text(r: dict, news_items: list, total: int, sector: str) -> str:
