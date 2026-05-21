@@ -15,7 +15,7 @@ if (-not (Test-Path $LOG_DIR)) {
 
 Write-Host "=== Antenna Task Setup ===" -ForegroundColor Cyan
 
-$taskNames = @("Antenna-Train","Antenna-Scan","Antenna-Predict-AM","Antenna-Predict-PM","Antenna-Noon-Review","Antenna-Daily-Review","Antenna-WeeklyTrain")
+$taskNames = @("Antenna-Train","Antenna-Scan","Antenna-Predict-AM","Antenna-Predict-PM","Antenna-Noon-Review","Antenna-Daily-Review","Antenna-WeeklyTrain","Antenna-LearnWeekly")
 foreach ($tn in $taskNames) {
     schtasks /delete /tn $tn /f 2>$null | Out-Null
 }
@@ -62,6 +62,8 @@ Reg "Antenna-Noon-Review"  (New-BatAction "$ROOT\scripts\run_noon_review.bat")  
 Reg "Antenna-Daily-Review" (New-BatAction "$ROOT\scripts\run_daily_review.bat") (New-Weekday "15:32")
 # P1 加权重训:每周日 20:00 执行(盘后且用户无感,失败不影响日级链路)
 Reg "Antenna-WeeklyTrain"  (New-BatAction "$ROOT\scripts\run_train_weekly.bat") (New-ScheduledTaskTrigger -Weekly -WeeksInterval 1 -DaysOfWeek Sunday -At "20:00")
+# P3/P4 学习编排:每周日 02:30 执行(Antenna 学习系统周日编排，P3 特征剪枝 + P4 价位网格搜索)
+Reg "Antenna-LearnWeekly"  (New-ScheduledTaskAction -Execute "python" -Argument "cli.py learn" -WorkingDirectory $ROOT) (New-ScheduledTaskTrigger -Weekly -WeeksInterval 1 -DaysOfWeek Sunday -At "02:30")
 
 Write-Host ""
 Write-Host "=== Verify ===" -ForegroundColor Cyan

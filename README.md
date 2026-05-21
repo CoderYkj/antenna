@@ -506,6 +506,7 @@ pm2_monitor:
 | `Antenna-Noon-Review` | 工作日 11:32 | 午间复盘 |
 | `Antenna-Daily-Review` | 工作日 15:32 | 收盘复盘 + 策略调整 |
 | `Antenna-WeeklyTrain` | **周日 20:00** | ★ P1 加权重训 |
+| `Antenna-LearnWeekly` | **周日 02:30** | ★ P3/P4 学习编排（特征剪枝 + 价位网格搜索） |
 
 ```powershell
 # 注册所有任务
