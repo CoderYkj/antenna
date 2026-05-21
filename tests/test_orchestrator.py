@@ -156,3 +156,31 @@ def test_check_returns_nonzero_on_corrupt_price_params(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     code = orchestrator.check()
     assert code != 0
+
+
+# ── feature_weights.json active 语义校验 ───────────────────────
+
+def test_check_rejects_unknown_active_col(tmp_path, monkeypatch):
+    """active 列表含非法列名 → check() 返回非零。"""
+    import json
+    (tmp_path / "learning").mkdir()
+    (tmp_path / "learning" / "feature_weights.json").write_text(
+        json.dumps({"active": ["ma5", "rsi6", "__totally_unknown_col__"]}),
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    code = orchestrator.check()
+    assert code != 0
+
+
+def test_check_accepts_valid_active_cols(tmp_path, monkeypatch):
+    """active 列表只含合法列名 → check() 返回 0。"""
+    import json
+    (tmp_path / "learning").mkdir()
+    (tmp_path / "learning" / "feature_weights.json").write_text(
+        json.dumps({"active": ["ma5", "rsi6", "main_net_in_1d"]}),
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    code = orchestrator.check()
+    assert code == 0

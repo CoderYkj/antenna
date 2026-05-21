@@ -113,9 +113,24 @@ def check() -> int:
             continue
         try:
             with open(p, encoding="utf-8") as f:
-                json.load(f)
+                data = json.load(f)
         except (json.JSONDecodeError, OSError) as e:
             errors.append(f"{p}: {e}")
+            continue
+
+        # 语义校验：feature_weights.json 的 active 列只能是合法特征列
+        if p.name == "feature_weights.json":
+            active = data.get("active", [])
+            if active:
+                try:
+                    from features.technical import FEATURE_COLS
+                    from data.alt_fetcher import ALT_COLS
+                    valid_cols = set(FEATURE_COLS) | set(ALT_COLS)
+                    unknown = [c for c in active if c not in valid_cols]
+                    if unknown:
+                        errors.append(f"{p}: active 含未知列: {unknown}")
+                except ImportError:
+                    pass  # 降级：导入失败时跳过语义校验
 
     if errors:
         for err in errors:
