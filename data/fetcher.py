@@ -1,8 +1,11 @@
 import akshare as ak
+import logging
 import pandas as pd
 import urllib.request
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+log = logging.getLogger(__name__)
 
 CACHE_DIR = Path(__file__).parent / "cache"
 
@@ -202,30 +205,23 @@ def fetch_financial_data(code: str) -> dict:
         em_suffix = ".SZ"
     em_code   = f"{code}{em_suffix}"
 
-    try:
-        result["abstract"] = ak.stock_financial_abstract(symbol=code)
-    except Exception as e:
-        print(f"[fetcher] {code} abstract 失败: {e}")
+    _KNOWN_EMPTY = ("no tables found",)
 
-    try:
-        result["profit"] = ak.stock_financial_benefit_ths(symbol=ths_code, indicator="按报告期")
-    except Exception as e:
-        print(f"[fetcher] {code} profit 失败: {e}")
+    def _fetch(key: str, fn):
+        try:
+            result[key] = fn()
+        except Exception as e:
+            msg = str(e).lower()
+            if any(k in msg for k in _KNOWN_EMPTY):
+                log.debug("[fetcher] %s %s 无数据: %s", code, key, e)
+            else:
+                log.warning("[fetcher] %s %s 失败: %s", code, key, e)
 
-    try:
-        result["balance"] = ak.stock_financial_debt_ths(symbol=ths_code, indicator="按报告期")
-    except Exception as e:
-        print(f"[fetcher] {code} balance 失败: {e}")
-
-    try:
-        result["cashflow"] = ak.stock_financial_cash_ths(symbol=ths_code, indicator="按报告期")
-    except Exception as e:
-        print(f"[fetcher] {code} cashflow 失败: {e}")
-
-    try:
-        result["indicator"] = ak.stock_financial_analysis_indicator(symbol=code, start_year="2020")
-    except Exception as e:
-        print(f"[fetcher] {code} indicator 失败: {e}")
+    _fetch("abstract",  lambda: ak.stock_financial_abstract(symbol=code))
+    _fetch("profit",    lambda: ak.stock_financial_benefit_ths(symbol=ths_code, indicator="按报告期"))
+    _fetch("balance",   lambda: ak.stock_financial_debt_ths(symbol=ths_code, indicator="按报告期"))
+    _fetch("cashflow",  lambda: ak.stock_financial_cash_ths(symbol=ths_code, indicator="按报告期"))
+    _fetch("indicator", lambda: ak.stock_financial_analysis_indicator(symbol=code, start_year="2020"))
 
     return result
 
