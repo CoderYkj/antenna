@@ -1046,7 +1046,78 @@ def _build_ai_reason_text(r: dict, news_items: list, total: int, sector: str) ->
     return elems[0]["content"] if elems else ""
 
 
+def _scan_ack_card(title: str, color: str, desc: str, steps: list, eta: str) -> dict:
+    """共享的「正在处理」ACK 卡片模板，供 cmd_scan_bot / cmd_tactic 使用。"""
+    numbered = ["①", "②", "③", "④", "⑤"]
+    steps_md = "\n".join(f"{numbered[i]} {s}" for i, s in enumerate(steps))
+    return {
+        "config": {"wide_screen_mode": True},
+        "header": {
+            "title": {"tag": "plain_text", "content": f"⏳ {title}…"},
+            "template": color,
+        },
+        "elements": [{"tag": "markdown", "content": (
+            f"{desc}\n\n{steps_md}\n\n"
+            f"结果将推送到本会话，预计 **{eta}**。"
+        )}],
+    }
+
+
 def cmd_scan_bot(top_n: int = 5) -> dict:
+    """推荐 <N>：立即返回进度卡片，后台扫描完成后推送结果。"""
+    import threading
+    from data.fetcher import cached_codes
+    from learning.optimizer import load_strategy
+
+    try:
+        _cfg = _load_cfg()
+        pool_cfg = _cfg.get("universe", {}).get("scan_pool", "watchlist")
+        if pool_cfg == "all":
+            n_codes = len(cached_codes())
+        else:
+            try:
+                from data.universe import load_universe
+                n_codes = len(load_universe(_cfg))
+            except Exception:
+                n_codes = len(cached_codes())
+    except Exception:
+        n_codes = 300
+
+    try:
+        _last_scan = load_strategy().get("last_scan_date", "")
+    except Exception:
+        _last_scan = ""
+    _first_today = _last_scan != _today()
+    if n_codes > 1000:
+        eta = "约 5-15 分钟" if _first_today else "约 3-7 分钟"
+    else:
+        eta = "约 2-5 分钟" if _first_today else "约 1-3 分钟"
+
+    ack_card = _scan_ack_card(
+        "Antenna 推荐 扫描中", "blue",
+        f"正在扫描 **{n_codes}** 只股票，筛选 Top **{top_n}**…",
+        ["全量特征计算 + AI 模型打分",
+         "信号分级（买入 / 观望 / 回避）",
+         "战法多维评分（价值 / 成长 / 龙头 / 逆向）",
+         "共振优选 + 深度分析"],
+        eta,
+    )
+
+    def _run():
+        try:
+            result = _cmd_scan_bot_impl(top_n)
+        except Exception as e:
+            log.exception("[推荐] 后台扫描失败")
+            result = {"msg_type": "text", "content": json.dumps(
+                {"text": f"推荐扫描失败：{e}"}, ensure_ascii=False)}
+        from server.feishu_push import push as _push
+        _push(result)
+
+    threading.Thread(target=_run, daemon=True).start()
+    return {"msg_type": "interactive", "content": json.dumps(ack_card, ensure_ascii=False)}
+
+
+def _cmd_scan_bot_impl(top_n: int = 5) -> dict:
     """
     推荐 <N>：扫描全量缓存股票，输出 Top N 买入候选 + 自选股快照。
     分两段：精简推荐清单 + 逐一深度分析。
@@ -1818,24 +1889,13 @@ def cmd_tactic(strategy_key: str, top_n: int = 5) -> dict:
     if not all_codes:
         return "本地无缓存数据，请先运行数据拉取（fetch）。"
 
-    ack_card = {
-        "config": {"wide_screen_mode": True},
-        "header": {
-            "title": {"tag": "plain_text", "content": f"⏳ {title} 选股中…"},
-            "template": color,
-        },
-        "elements": [
-            {"tag": "markdown", "content": (
-                f"**{title}**\n"
-                f"> 筛选条件：{criteria}\n\n"
-                f"正在从 **{len(all_codes)}** 只缓存股中筛选 Top **{top_n}**…\n"
-                "① 技术面初筛（本地缓存）\n"
-                "② 并行获取基本面数据\n"
-                "③ 多维评分排名\n\n"
-                "结果将推送到本会话，预计 30-60 秒。"
-            )},
-        ],
-    }
+    ack_card = _scan_ack_card(
+        f"{title} 选股中", color,
+        f"**{title}**\n> 筛选条件：{criteria}\n\n"
+        f"正在从 **{len(all_codes)}** 只缓存股中筛选 Top **{top_n}**…",
+        ["技术面初筛（本地缓存）", "并行获取基本面数据", "多维评分排名"],
+        "30-60 秒",
+    )
 
     def _run():
         try:
