@@ -1211,11 +1211,13 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
     top.sort(key=lambda r: float(r.get("global_rank_pct", 1.0)))
 
     # 按战法层次过滤：tier1(共振≥2) 在前，tier2(单战法=1) 在后，0 战法不展示
-    tier1, tier2 = _tier_split(top)
-    # 只推荐 AI 买入信号股，回避/观望不展示
-    tier1 = [r for r in tier1 if r.get("signal") == "买入"]
-    tier2 = [r for r in tier2 if r.get("signal") == "买入"]
+    tier1_all, tier2_all = _tier_split(top)
+    # 主推荐：AI 买入信号 + 战法认可
+    tier1 = [r for r in tier1_all if r.get("signal") == "买入"]
+    tier2 = [r for r in tier2_all if r.get("signal") == "买入"]
     top = (tier1 + tier2)[:top_n]
+    # 关注候选：AI 观望信号 + 战法认可（主推荐为空时补充展示）
+    tier_watch = [r for r in tier1_all + tier2_all if r.get("signal") == "观望"][:top_n]
 
     # 获取热点行业数据
     try:
@@ -1302,21 +1304,48 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
     except Exception:
         pass
 
-    # 无战法认可股票时，返回灰色空推荐卡片
+    # 主推荐为空时：展示"值得关注"卡片（观望+战法认可）或灰色空卡片
     if not top:
-        _empty_card = {
+        _watch_elements = [{"tag": "markdown", "content": (
+            f"共扫描 **{total}** 只，AI 买入信号 **{n_buy}** 只。\n"
+            + (f"今日无买入信号，以下为战法认可的观望标的，供候选参考。\n" if tier_watch
+               else f"今日暂无战法认可的推荐股票，建议观望。\n")
+            + f"市场状态 **{_current_state}**{_active_cnt_str}"
+        )}]
+        if tier_watch:
+            watch_lines = [
+                "**今日值得关注（战法认可·观望信号）**",
+                "_⚠️ AI 信号为「观望」，战法有共振；等待信号转「买入」后再操作_\n",
+            ]
+            for i, r in enumerate(tier_watch, 1):
+                name     = _escape_md(r.get("name", r["code"]))
+                conf     = r.get("confidence", "")
+                grank    = r.get("global_rank_pct")
+                grank_n  = r.get("global_rank", 0)
+                rank_str = f"全市场{_fmt_rank(grank, grank_n, total)}" if grank is not None else f"{r['rise_prob']:.1%}"
+                tags     = r.get("tactic_tags", {})
+                tag_str  = ("  ★" + "+".join(tags.keys())) if tags else ""
+                dual     = r.get("dual_trade", {})
+                s_gain   = dual.get("short", {}).get("gain_pct")
+                l_gain   = dual.get("long",  {}).get("gain_pct")
+                gain_str = f"  短线 **+{s_gain:.1f}%**  长线 **+{l_gain:.1f}%**" if (s_gain is not None and l_gain is not None) else ""
+                price    = r["price_info"].get("price") or r["price_info"].get("close", "")
+                price_str = f"  现价 **{price}**" if price else ""
+                prob_str  = f"  涨概率 **{r['rise_prob']:.1%}**"
+                line1 = f"{i}. **{name}**（{r['code']}）　👀观望　{rank_str} [{conf}]{tag_str}"
+                line2 = f"　💹{price_str}{prob_str}{gain_str}"
+                watch_lines.append(f"{line1}\n{line2}")
+            _watch_elements.append({"tag": "hr"})
+            _watch_elements.append({"tag": "markdown", "content": "\n".join(watch_lines)})
+        _fallback_card = {
             "config": {"wide_screen_mode": True},
             "header": {
                 "title": {"tag": "plain_text", "content": f"Antenna 推荐　{scan_date}"},
-                "template": "grey",
+                "template": "yellow" if tier_watch else "grey",
             },
-            "elements": [{"tag": "markdown", "content": (
-                f"共扫描 **{total}** 只，AI 买入信号 **{n_buy}** 只。\n"
-                f"今日暂无战法认可的推荐股票，建议观望。\n"
-                f"市场状态 **{_current_state}**{_active_cnt_str}"
-            )}],
+            "elements": _watch_elements,
         }
-        return {"msg_type": "interactive", "content": json.dumps(_empty_card, ensure_ascii=False)}
+        return {"msg_type": "interactive", "content": json.dumps(_fallback_card, ensure_ascii=False)}
 
     # 推荐清单（简洁表格）
     elements.append({
