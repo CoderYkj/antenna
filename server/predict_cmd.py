@@ -1174,10 +1174,10 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
     _s["last_scan_date"]    = _today()
     save_strategy(_s)
 
-    # 只取 AI 双门槛买入信号的股票作为候选（已按 rise_prob+momentum 降序排列）
-    buy_results = [r for r in results if r.get("signal") == "买入"]
-    n_buy = len(buy_results)
-    top = buy_results[:top_n * 2]
+    # 候选池：取 AI 高分股（按 rise_prob+momentum 降序），不预过滤信号
+    # 战法评分从这里筛选有共振的股票；AI 买入信号数仅作展示参考
+    n_buy = sum(1 for r in results if r.get("signal") == "买入")
+    top = results[:top_n * 4]
 
     # 补充实时行情
     top_codes = [r["code"] for r in top]
