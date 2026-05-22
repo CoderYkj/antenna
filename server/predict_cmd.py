@@ -1212,6 +1212,9 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
 
     # 按战法层次过滤：tier1(共振≥2) 在前，tier2(单战法=1) 在后，0 战法不展示
     tier1, tier2 = _tier_split(top)
+    # 只推荐 AI 买入信号股，回避/观望不展示
+    tier1 = [r for r in tier1 if r.get("signal") == "买入"]
+    tier2 = [r for r in tier2 if r.get("signal") == "买入"]
     top = (tier1 + tier2)[:top_n]
 
     # 获取热点行业数据
