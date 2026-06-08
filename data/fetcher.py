@@ -205,7 +205,7 @@ def fetch_financial_data(code: str) -> dict:
         em_suffix = ".SZ"
     em_code   = f"{code}{em_suffix}"
 
-    _KNOWN_EMPTY = ("no tables found",)
+    _KNOWN_EMPTY = ("no tables found", "nonetype' object has no attribute")
 
     def _fetch(key: str, fn):
         try:
@@ -289,6 +289,7 @@ def _refresh_name_map() -> dict:
 SECTOR_MAP_FILE = Path(__file__).parent / "sector_map.json"
 _SECTOR_CACHE: dict = {}          # 进程内缓存
 _HOT_SECTORS_CACHE: tuple = (0.0, [])   # (timestamp, list)
+_SECTOR_REFRESH_LAST_TRY: float = 0.0  # 上次刷新时间戳
 
 
 def _load_sector_map() -> dict:
@@ -307,33 +308,76 @@ def _load_sector_map() -> dict:
 
 
 def _refresh_sector_map() -> dict:
-    """从申万行业数据构建 {code_6digit: industry_name} 映射，并写入缓存。"""
+    """从申万行业数据构建 {code_6digit: industry_name} 映射，并写入缓存。
+
+    增加了重试与节流，遇到解析层面（BeautifulSoup）类似的可忽略错误时降级为 debug。
+    """
     import json, time
+    global _SECTOR_REFRESH_LAST_TRY
+    now = time.time()
+    # 节流：1 小时内不重复尝试，避免频繁报错/重复网络请求
+    if now - _SECTOR_REFRESH_LAST_TRY < 3600:
+        log.debug("[fetcher] _refresh_sector_map throttled; last try %.0fs ago", now - _SECTOR_REFRESH_LAST_TRY)
+        return {}
+    _SECTOR_REFRESH_LAST_TRY = now
+
     try:
-        industries = ak.sw_index_first_info()
-        codes_col  = industries.columns[0]   # 行业代码
-        names_col  = industries.columns[1]   # 行业名称
+        attempts = 3
+        industries = None
+        for i in range(attempts):
+            try:
+                industries = ak.sw_index_first_info()
+                if industries is not None and not (hasattr(industries, "empty") and industries.empty):
+                    break
+            except Exception as e:
+                log.debug("[fetcher] sw_index_first_info attempt %d failed: %s", i + 1, e)
+            time.sleep(0.5)
+
+        if industries is None or (hasattr(industries, "empty") and industries.empty):
+            log.debug("[fetcher] sw_index_first_info returned no data")
+            return {}
+
+        codes_col = industries.columns[0]   # 行业代码
+        names_col = industries.columns[1]   # 行业名称
 
         mapping: dict = {}
         for _, row in industries.iterrows():
-            sw_code  = row[codes_col]
+            sw_code = row[codes_col]
             ind_name = row[names_col]
-            try:
-                members  = ak.sw_index_third_cons(symbol=sw_code)
-                code_col = members.columns[1]   # 股票代码，格式 600519.SH
-                for raw_code in members[code_col]:
-                    c6 = str(raw_code).split(".")[0].zfill(6)
-                    mapping[c6] = ind_name
-            except Exception:
-                pass
-            time.sleep(0.3)   # 避免并发导致服务端拒绝
+
+            members = None
+            for i in range(attempts):
+                try:
+                    members = ak.sw_index_third_cons(symbol=sw_code)
+                    if members is not None:
+                        break
+                except Exception as e:
+                    log.debug("[fetcher] sw_index_third_cons %s attempt %d failed: %s", sw_code, i + 1, e)
+                time.sleep(0.3)
+
+            if members is None or (hasattr(members, "empty") and members.empty):
+                continue
+
+            # 兼容不同列索引布局
+            code_col = members.columns[1] if len(members.columns) > 1 else members.columns[0]
+            for raw_code in members[code_col]:
+                c6 = str(raw_code).split(".")[0].zfill(6)
+                mapping[c6] = ind_name
+
+            time.sleep(0.2)   # 轻微延迟，避免短时大量请求
 
         if mapping:
             with open(SECTOR_MAP_FILE, "w", encoding="utf-8") as f:
                 json.dump(mapping, f, ensure_ascii=False)
         return mapping
+
     except Exception as e:
-        print(f"[fetcher] 行业映射刷新失败: {e}")
+        msg = str(e).lower()
+        # BeautifulSoup 解析异常（NoneType find_all）等是常见的可忽略错误，降级为 debug
+        if "find_all" in msg or "none" in msg:
+            log.debug("[fetcher] 行业映射刷新出现可忽略错误: %s", e)
+        else:
+            log.warning("[fetcher] 行业映射刷新失败: %s", e)
         return {}
 
 
