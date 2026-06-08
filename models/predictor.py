@@ -168,19 +168,35 @@ def assign_global_signals(results: list[dict], buy_top_pct: float) -> list[dict]
     watch_top_pct = min(buy_top_pct * 3, 0.40)
 
     # 尝试读 abs_threshold(失败则回退宽松)
+    abs_threshold_failed = False
     try:
         from learning import model_learner
         abs_threshold = model_learner.load_abs_threshold()
     except Exception:
         abs_threshold = 0.0  # 失败时等价于单门槛
+        abs_threshold_failed = True
+
+    # 模型质量检测：全批次最高校准概率低于最低信任水位(0.10) → 模型严重退化
+    # 但当 abs_threshold 无法加载时（calibrator/状态异常）不应把低校准概率误判为模型退化，
+    # 因此在 abs_threshold_failed 情况下跳过 degraded 判定。
+    max_cal_prob = max(
+        (r.get("rise_prob_cal", r.get("rise_prob", 0.0)) for r in ranked),
+        default=0.0,
+    )
+    _DEGRADED_FLOOR = 0.10
+    model_degraded = (not abs_threshold_failed) and (max_cal_prob < _DEGRADED_FLOOR)
 
     for idx, r in enumerate(ranked):
         rank_pct = (idx + 1) / n
         r["global_rank"]     = idx + 1
         r["global_rank_pct"] = round(rank_pct, 4)
+        r["max_cal_prob"]    = round(max_cal_prob, 4)
         prob_cal = r.get("rise_prob_cal", r.get("rise_prob", 0.0))
 
-        if rank_pct <= buy_top_pct and prob_cal >= abs_threshold:
+        if model_degraded:
+            # 退化模型：全批次无股票达到 abs_threshold，强制所有信号为观望/回避
+            r["signal"], r["confidence"] = ("观望", "中") if rank_pct <= watch_top_pct else ("回避", "低")
+        elif rank_pct <= buy_top_pct and prob_cal >= abs_threshold:
             r["signal"], r["confidence"] = "买入", "高"
         elif rank_pct <= buy_top_pct:
             r["signal"], r["confidence"] = "观望", "中"

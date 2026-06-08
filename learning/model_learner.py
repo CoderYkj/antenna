@@ -483,6 +483,17 @@ def _feature_cols_from_model(model) -> list[str]:
     return list(FEATURE_COLS)
 
 
+def _calibrator_max_output(calibrator) -> float | None:
+    """返回校准器的最大输出值（用于 abs_threshold 上限自适应）。"""
+    if isinstance(calibrator, IdentityCalibrator):
+        return None
+    try:
+        # sklearn IsotonicRegression 保存了 y_thresholds_（分段常量的各段值）
+        return float(max(calibrator.y_thresholds_))
+    except AttributeError:
+        return None
+
+
 def _persist_state(
     date_str: str,
     summary: dict,
@@ -504,7 +515,28 @@ def _persist_state(
     if new_threshold != cur_threshold + delta:
         reason += " (clamped)"
 
+    # 自适应上限：abs_threshold 不得超过所有校准器最大输出的 85%，
+    # 否则全量股票均无法过门槛（模型校准区间与阈值脱节）。
+    # 自适应上限：仅在本次有新模型/校准器时启用（由 fit_calibrators 传入 model_path/model_sha），
+    # 避免在测试或手动直接调用 _persist_state 时被 repo 中历史校准器影响。
+    if model_path is not None or model_sha is not None:
+        cal_maxes = []
+        for state in STATES:
+            cal = load_calibrator(state)
+            m = _calibrator_max_output(cal)
+            if m is not None and m > 0:
+                cal_maxes.append(m)
+        if cal_maxes:
+            adaptive_ceiling = round(min(cal_maxes) * 0.85, 4)
+            if new_threshold > adaptive_ceiling and adaptive_ceiling >= lo:
+                new_threshold = adaptive_ceiling
+                reason += f" (cal_max_cap={adaptive_ceiling:.4f})"
+    else:
+        logger.debug("_persist_state: skipping adaptive cal_max_cap because no model_path/model_sha provided")
+
     threshold_history = list(prev.get("threshold_history") or [])
+    # 同一天只保留最后一条，防止多次调用在同日反复 ratchet 阈值
+    threshold_history = [h for h in threshold_history if h.get("date") != date_str]
     threshold_history.append({
         "date":          date_str,
         "acc_30d":       round(acc_30d, 4) if acc_30d is not None else None,
@@ -538,7 +570,7 @@ def _load_state_safely() -> dict:
 
 
 def _compute_recent_buy_accuracy(date_str: str, lookback_days: int) -> tuple[float | None, int]:
-    """近 lookback_days 日 signal=买入 的精准率(hit_tier ∈ {good,great})与买入数。
+    """近 lookback_days 日 signal=买入 的精准率(hit_tier ∈ {weak,good,great},即涨幅 ≥1%)与买入数。
 
     无足够数据返回 (None, 0)。
     """
@@ -561,7 +593,7 @@ def _compute_recent_buy_accuracy(date_str: str, lookback_days: int) -> tuple[flo
             if tier is None:
                 continue
             total += 1
-            if tier in ("good", "great"):
+            if tier in ("weak", "good", "great"):
                 hits += 1
     if total == 0:
         return None, 0
