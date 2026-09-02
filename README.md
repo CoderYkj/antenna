@@ -109,6 +109,8 @@ antenna/
 │   ├── task_daily_review.py       # 收盘复盘
 │   ├── task_noon_review.py        # 午间复盘
 │   ├── task_train.py              # 定时训练
+│   ├── task_fill_5d_metrics.py    # 每日回填 5 日 hit/回撤指标
+│   ├── smoke_test.py              # 功能冒烟测试（核心指令响应校验）
 │   ├── run_*.bat                  # 任务计划入口
 │   └── setup_tasks.ps1            # Windows 任务计划一键注册
 │
@@ -551,7 +553,7 @@ pm2_monitor:
 | `Antenna-Predict-AM` | 工作日 09:30 起每 10 min | 上午盘中预测（动态特征列 + alt） |
 | `Antenna-Predict-PM` | 工作日 13:00 起每 10 min | 下午盘中预测 |
 | `Antenna-Noon-Review` | 工作日 11:32 | 午间复盘 |
-| `Antenna-Daily-Review` | 工作日 15:32 | 收盘复盘 + 策略调整 |
+| `Antenna-Daily-Review` | 工作日 15:32 | 收盘复盘 + 策略调整（内部调用 `scripts/task_fill_5d_metrics.py` 回填 5 日指标） |
 | `Antenna-WeeklyTrain` | **周日 20:00** | P1 加权重训 |
 | `Antenna-LearnWeekly` | **周日 02:30** | P3/P4 学习编排（特征剪枝 + 价位网格搜索） |
 
@@ -602,7 +604,7 @@ python cli.py style              # 真实写入
 - **机器人**：requests（飞书 Open Platform）
 - **进程管理**：PM2（Node.js）+ Windows 任务计划
 - **存储**：Parquet（行情缓存 + alt 缓存）+ JSONL（pred / outcome 归档）
-- **测试**：pytest（384 用例，覆盖学习系统全链路）
+- **测试**：pytest（402 用例，覆盖学习系统全链路）+ `scripts/smoke_test.py`（飞书指令冒烟测试）
 
 ---
 
