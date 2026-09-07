@@ -124,12 +124,14 @@ def _try_call(fn, *args, **kwargs):
 def fetch_alt_features(
     codes: list[str],
     date_str: str,
+    cache_only: bool = False,
 ) -> dict[str, dict[str, float | None]]:
     """批量拉取 5 个 alt_data 特征，缓存到 parquet，返回 {code: {feature: value}}。
 
     - 每个接口独立失败，失败特征返回 None
     - 同日已有缓存直接读取，不重复拉取
     - codes 为空时返回 {}
+    - cache_only=True：只读缓存，不触发网络拉取（用于 bot 实时路径）
     """
     if not codes:
         return {}
@@ -145,11 +147,19 @@ def fetch_alt_features(
             for _, row in cached_df.iterrows():
                 code = str(row.get("code", ""))
                 result[code] = {col: row.get(col) for col in ALT_COLS}
+            # cache_only 模式：有缓存就直接返回（即使不完整）
+            if cache_only:
+                return result
             # 仅当所有请求的 codes 都在缓存中时才返回，否则补充拉取
             if result and set(codes) <= set(result.keys()):
                 return result
         except Exception:
             pass
+
+    # cache_only 模式：无缓存直接返回空，不触发网络请求
+    if cache_only:
+        logger.info("[alt_fetcher] cache_only=True 但今日缓存不存在，返回 {}")
+        return {}
 
     # ── 拉取各接口（串行，避免频率限制）──────────────────────
     logger.info("[alt_fetcher] 拉取 %d 支股票 alt_data (%s)", len(codes), date_str)

@@ -26,7 +26,7 @@ def test_module_failure_does_not_block_others(monkeypatch, tmp_path):
         {"name": "after_boom",  "run": ok_run,    "depends_on": []},
     ])
     # 让 send_alert 静默,避免往本机真飞书发
-    monkeypatch.setattr(orchestrator.alerts, "_get_webhook", lambda: "")
+    monkeypatch.setattr(orchestrator.alerts, "_push_alert", lambda msg: False)
     monkeypatch.setattr(orchestrator.alerts, "ALERTS_FILE", tmp_path / "alerts.jsonl")
 
     result = orchestrator.run_all(date_str="2026-04-27")
@@ -49,7 +49,7 @@ def test_module_with_unmet_dependency_skipped(monkeypatch, tmp_path):
         {"name": "boom",  "run": boom_run,  "depends_on": []},
         {"name": "after", "run": after_run, "depends_on": ["boom"]},
     ])
-    monkeypatch.setattr(orchestrator.alerts, "_get_webhook", lambda: "")
+    monkeypatch.setattr(orchestrator.alerts, "_push_alert", lambda msg: False)
     monkeypatch.setattr(orchestrator.alerts, "ALERTS_FILE", tmp_path / "alerts.jsonl")
 
     result = orchestrator.run_all(date_str="2026-04-27")

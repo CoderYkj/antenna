@@ -850,11 +850,11 @@ def _fetch_em_news_raw(code: str, page_size: int = 10) -> list:
 
 
 def _classify_news(items: list) -> list:
-    """将原始 item 转为 (title, snippet, is_pos, is_neg, date_str) 元组列表。"""
+    """将原始 item 转为 (title, snippet, is_pos, is_neg, date_str, url) 元组列表。"""
     result = []
     for it in items:
         title = (it.get("title") or "").replace("<em>", "").replace("</em>", "").strip()
-        abst  = (it.get("art_abstract") or "").replace("<em>", "").replace("</em>", "").strip()
+        abst  = (it.get("art_abstract") or it.get("content") or "").replace("<em>", "").replace("</em>", "").strip()
         text  = (title + " " + abst).strip()
         if not text:
             continue
@@ -862,7 +862,8 @@ def _classify_news(items: list) -> list:
         is_neg = any(w in text for w in _NEG_WORDS)
         snippet  = title if title else abst[:80]
         date_str = (it.get("date") or "")[:10]   # 取 YYYY-MM-DD
-        result.append((title, snippet, is_pos, is_neg, date_str))
+        url      = (it.get("url") or "").strip()
+        result.append((title, snippet, is_pos, is_neg, date_str, url))
     return result
 
 
@@ -944,7 +945,7 @@ def fetch_cls_news_for(name: str, sector: str = "", code: str = "",
         classified = cached[1]
 
     pos_texts, neg_texts, neu_texts = [], [], []
-    for _title, snippet, is_pos, is_neg, _date in classified:
+    for _title, snippet, is_pos, is_neg, _date, _url in classified:
         if is_pos and not is_neg:
             pos_texts.append(snippet)
         elif is_neg and not is_pos:
@@ -1066,6 +1067,216 @@ def _pos_zone(pct: float) -> str:
     if pct <= 30:   return "偏低区"
     if pct <= 70:   return "中位区"
     return "偏高区"
+
+
+def _detect_candle_patterns(df: pd.DataFrame) -> list[tuple[str, str]]:
+    """检测近5日K线形态，返回 [(形态名, 看涨/看跌/中性), ...]。
+    多K形态优先；单K按时间倒序，已被多K消耗的不重复。
+    形态名中包含成交量确认标记（放量确认）。
+    """
+    if df is None or len(df) < 3:
+        return []
+
+    needed = [c for c in ["open", "high", "low", "close", "volume"] if c in df.columns]
+    tail = df[needed].tail(5).astype(float).reset_index(drop=True)
+    n = len(tail)
+    has_vol = "volume" in tail.columns
+
+    def _c(i):
+        r = tail.iloc[i]
+        b  = r["close"] - r["open"]
+        f  = r["high"]  - r["low"]
+        u  = r["high"]  - max(r["open"], r["close"])
+        lo = min(r["open"], r["close"]) - r["low"]
+        return r["open"], r["high"], r["low"], r["close"], b, f, u, lo
+
+    def _vol_tag(i: int, direction: str) -> str:
+        if not has_vol or i == 0:
+            return ""
+        vols = tail["volume"].tolist()
+        avg = sum(vols[max(0, i - 3):i]) / max(min(i, 3), 1)
+        if avg <= 0:
+            return ""
+        ratio = vols[i] / avg
+        if ratio >= 1.5:
+            return "（放量确认）"
+        if ratio >= 1.2:
+            return "（温和放量）"
+        if ratio <= 0.6 and direction == "看涨":
+            return "（缩量待确认）"
+        return ""
+
+    results: list[tuple[str, str]] = []
+    used: set[int] = set()
+
+    # ── 三根K线形态 ────────────────────────────────────────────
+    if n >= 3:
+        i0, i1, i2 = n - 3, n - 2, n - 1
+        o0, h0, l0, c0, b0, f0, u0, lo0 = _c(i0)
+        o1, h1, l1, c1, b1, f1, u1, lo1 = _c(i1)
+        o2, h2, l2, c2, b2, f2, u2, lo2 = _c(i2)
+
+        if b0 > 0 and b1 > 0 and b2 > 0 and c1 > c0 and c2 > c1 and \
+                b0 > 0.5 * f0 and b1 > 0.5 * f1 and b2 > 0.5 * f2:
+            results.append((f"红三兵{_vol_tag(i2, '看涨')}", "看涨"))
+            used.update([i0, i1, i2])
+        elif b0 < 0 and b1 < 0 and b2 < 0 and c1 < c0 and c2 < c1 and \
+                abs(b0) > 0.5 * f0 and abs(b1) > 0.5 * f1 and abs(b2) > 0.5 * f2:
+            results.append((f"黑三兵{_vol_tag(i2, '看跌')}", "看跌"))
+            used.update([i0, i1, i2])
+        elif b0 < 0 and f1 > 0 and abs(b1) < 0.3 * f1 and b2 > 0 and c2 > (o0 + c0) / 2:
+            results.append((f"早晨之星{_vol_tag(i2, '看涨')}", "看涨"))
+            used.update([i0, i1, i2])
+        elif b0 > 0 and f1 > 0 and abs(b1) < 0.3 * f1 and b2 < 0 and c2 < (o0 + c0) / 2:
+            results.append((f"黄昏之星{_vol_tag(i2, '看跌')}", "看跌"))
+            used.update([i0, i1, i2])
+
+    # ── 双根K线形态 ────────────────────────────────────────────
+    if n >= 2:
+        p, ci = n - 2, n - 1
+        if p not in used and ci not in used:
+            op, hp, lp, cp, bp, fp, up, lop = _c(p)
+            oc, hc, lc, cc, bc, fc, uc, loc = _c(ci)
+            p_top, p_bot = max(op, cp), min(op, cp)
+            c_top, c_bot = max(oc, cc), min(oc, cc)
+            mid_p = (op + cp) / 2
+
+            if bp < 0 and bc > 0 and c_top > p_top and c_bot < p_bot:
+                results.append((f"看涨吞噬{_vol_tag(ci, '看涨')}", "看涨"))
+                used.update([p, ci])
+            elif bp > 0 and bc < 0 and c_top > p_top and c_bot < p_bot:
+                results.append((f"看跌吞噬{_vol_tag(ci, '看跌')}", "看跌"))
+                used.update([p, ci])
+            # 刺透形态：前阴+后阳低开收超前阴中点
+            elif bp < 0 and bc > 0 and oc < lp and cc > mid_p and cc < cp:
+                results.append((f"刺透形态{_vol_tag(ci, '看涨')}", "看涨"))
+                used.update([p, ci])
+            # 乌云盖顶：前阳+后阴高开收低于前阳中点
+            elif bp > 0 and bc < 0 and oc > hp and cc < mid_p and cc > op:
+                results.append((f"乌云盖顶{_vol_tag(ci, '看跌')}", "看跌"))
+                used.update([p, ci])
+            elif bp < 0 and bc > 0 and c_top < p_top and c_bot > p_bot:
+                results.append(("看涨孕线", "看涨"))
+                used.update([p, ci])
+            elif bp > 0 and bc < 0 and c_top < p_top and c_bot > p_bot:
+                results.append(("看跌孕线", "看跌"))
+                used.update([p, ci])
+            # 平头顶：两根K线最高价相近，上方受阻
+            elif abs(hp - hc) / max(hp, hc) < 0.003 and (bp > 0 or bc > 0):
+                results.append(("平头顶", "看跌"))
+                used.update([p, ci])
+            # 平头底：两根K线最低价相近，下方支撑
+            elif abs(lp - lc) / max(lp, lc) < 0.003 and (bp < 0 or bc < 0):
+                results.append(("平头底", "看涨"))
+                used.update([p, ci])
+
+    # ── 跳空缺口（最近两根）──────────────────────────────────────
+    if n >= 2 and (n - 2) not in used and (n - 1) not in used:
+        op2, hp2, lp2, cp2 = tail.iloc[n - 2][["open", "high", "low", "close"]]
+        oc2, hc2, lc2, cc2 = tail.iloc[n - 1][["open", "high", "low", "close"]]
+        if lc2 > hp2:
+            gap_pct = (lc2 - hp2) / hp2 * 100
+            results.append((f"向上跳空缺口（{gap_pct:.1f}%）", "看涨"))
+        elif hc2 < lp2:
+            gap_pct = (lp2 - hc2) / hc2 * 100
+            results.append((f"向下跳空缺口（{gap_pct:.1f}%）", "看跌"))
+
+    # ── 单根K线形态（今日→4日前，跳过已用）──────────────────────
+    day_labels = ["今日", "昨日", "2日前", "3日前", "4日前"]
+    for offset in range(min(n, 5)):
+        i = n - 1 - offset
+        if i in used:
+            continue
+        o, h, l, c, b, f, u, lo = _c(i)
+        if f < 1e-6:
+            continue
+        ab         = abs(b)
+        body_ratio = ab / f
+        pct_chg    = (c - o) / o * 100 if o else 0
+        lbl        = day_labels[offset]
+        sig        = "看涨" if b > 0 else "看跌"
+        vt         = _vol_tag(i, sig)
+
+        if b > 0 and body_ratio >= 0.75 and pct_chg >= 2.5:
+            results.append((f"大阳线{vt}（{lbl}）", "看涨"))
+        elif b < 0 and body_ratio >= 0.75 and pct_chg <= -2.5:
+            results.append((f"大阴线{vt}（{lbl}）", "看跌"))
+        elif body_ratio < 0.1:
+            results.append((f"十字星（{lbl}）", "中性"))
+        elif 0.1 <= body_ratio < 0.3 and u > ab and lo > ab:
+            results.append((f"纺锤线（{lbl}）", "中性"))
+        elif ab > 0 and lo >= 2 * ab and u <= ab * 0.5 and body_ratio < 0.35:
+            prev_c = tail["close"].iloc[max(0, i - 3):i].tolist()
+            if prev_c and prev_c[-1] > prev_c[0]:
+                results.append((f"上吊线（{lbl}）", "看跌"))
+            else:
+                results.append((f"锤子线{vt}（{lbl}）", "看涨"))
+        elif ab > 0 and u >= 2 * ab and lo <= ab * 0.5 and body_ratio < 0.35:
+            prev_c = tail["close"].iloc[max(0, i - 3):i].tolist()
+            if prev_c and prev_c[-1] > prev_c[0]:
+                results.append((f"射击之星（{lbl}）", "看跌"))
+            else:
+                results.append((f"倒锤线（{lbl}）", "看涨"))
+
+    return results
+
+
+def _candle_pattern_section(df: pd.DataFrame) -> str:
+    """生成K线形态 markdown 段，无识别时返回空字符串。"""
+    patterns = _detect_candle_patterns(df)
+    if not patterns:
+        return ""
+
+    # 连续涨跌背景
+    context = ""
+    if len(df) >= 4:
+        closes = df["close"].tail(6).tolist()
+        streak, direction = 0, None
+        for i in range(len(closes) - 1, 0, -1):
+            d = "up" if closes[i] > closes[i - 1] else ("down" if closes[i] < closes[i - 1] else None)
+            if d is None:
+                break
+            if direction is None:
+                direction = d
+            if d == direction:
+                streak += 1
+            else:
+                break
+        if streak >= 2 and direction:
+            context = f"近{streak}日{'连涨' if direction == 'up' else '连跌'}后"
+
+    bullish = [nm for nm, s in patterns if s == "看涨"]
+    bearish = [nm for nm, s in patterns if s == "看跌"]
+    neutral = [nm for nm, s in patterns if s == "中性"]
+
+    # 近期权重：今日=5 昨日=4 2日前=3 3日前=2 4日前=1；多K形态无日标签视为权重4
+    _day_weight = {"今日": 5, "昨日": 4, "2日前": 3, "3日前": 2, "4日前": 1}
+    def _w(name: str) -> int:
+        for lbl, w in _day_weight.items():
+            if lbl in name:
+                return w
+        return 4  # 双K/三K形态不带日标签，近期发生
+
+    bull_score = sum(_w(nm) for nm in bullish)
+    bear_score = sum(_w(nm) for nm in bearish)
+
+    if bull_score > bear_score * 1.2:
+        signal_line = "**K线信号  🟢 买入**"
+    elif bear_score > bull_score * 1.2:
+        signal_line = "**K线信号  🔴 卖出**"
+    else:
+        signal_line = "**K线信号  ⚪ 观望（多空交织）**"
+
+    lines = [f"**🕯 K线形态（近5日）**{'  ' + context if context else ''}"]
+    for nm in bullish:
+        lines.append(f"🟢 看涨：{nm}")
+    for nm in bearish:
+        lines.append(f"🔴 看跌：{nm}")
+    for nm in neutral:
+        lines.append(f"⚪ 中性：{nm}")
+    lines.append(signal_line)
+    return "\n".join(lines)
+
 
 
 def _ma_arrangement(close: float, ma5, ma20, ma60) -> str:
@@ -1272,31 +1483,88 @@ def _signal_section(df: pd.DataFrame, cur_price: float = None) -> str:
             elif close >= upper * 0.985:
                 bear.append(f"触及布林上轨（{upper:.2f}），超买区间")
 
+    # 突破近20日高低点
+    if close > 0 and len(df) >= 22:
+        prev_hi = float(df["high"].iloc[-22:-1].tail(20).max())
+        prev_lo = float(df["low"].iloc[-22:-1].tail(20).min())
+        if close > prev_hi:
+            bull.append(f"突破近20日高点（{prev_hi:.2f}）")
+        elif close < prev_lo:
+            bear.append(f"跌破近20日低点（{prev_lo:.2f}）")
+
+    # 量价配合
+    if "vol_ratio" in df.columns and "pct_change" in df.columns:
+        vr_s = df["vol_ratio"].dropna()
+        pc_s = df["pct_change"].dropna()
+        if len(vr_s) > 0 and len(pc_s) > 0:
+            vr = float(vr_s.iloc[-1])
+            pc = float(pc_s.iloc[-1])
+            if vr >= 2.0 and pc > 0:
+                bull.append(f"放量上涨（量比{vr:.1f}×），主力积极")
+            elif vr >= 2.0 and pc < -0.01:
+                bear.append(f"放量下跌（量比{vr:.1f}×），主力出逃")
+            elif vr <= 0.4 and pc > 0.01:
+                bear.append(f"缩量上涨（量比{vr:.1f}×），动能不足")
+
+    # CCI 极值
+    if "cci" in df.columns:
+        cci_s = df["cci"].dropna()
+        if len(cci_s) > 0:
+            cci_val = float(cci_s.iloc[-1])
+            if cci_val <= -100:
+                bull.append(f"CCI超卖（{cci_val:.0f}）")
+            elif cci_val >= 100:
+                bear.append(f"CCI超买（{cci_val:.0f}）")
+
+    # KDJ J 极端值（与 K/D 超买超卖互补）
+    if "kdj_j" in df.columns:
+        j_s = df["kdj_j"].dropna()
+        if len(j_s) > 0:
+            j_val = float(j_s.iloc[-1])
+            if j_val < 0:
+                bull.append(f"KDJ-J超卖（J={j_val:.0f}）")
+            elif j_val > 100:
+                bear.append(f"KDJ-J超买（J={j_val:.0f}）")
+
+    # MACD 背离（近20日分前后两半比较）
+    if "macd_dif" in df.columns and len(df) >= 20:
+        _sub = df[["close", "macd_dif"]].tail(20).dropna()
+        if len(_sub) >= 14:
+            _mid = len(_sub) // 2
+            _f, _s = _sub.iloc[:_mid], _sub.iloc[_mid:]
+            f_lo, s_lo = float(_f["close"].min()), float(_s["close"].min())
+            fm_lo, sm_lo = float(_f["macd_dif"].min()), float(_s["macd_dif"].min())
+            f_hi, s_hi = float(_f["close"].max()), float(_s["close"].max())
+            fm_hi, sm_hi = float(_f["macd_dif"].max()), float(_s["macd_dif"].max())
+            if s_lo < f_lo * 0.99 and sm_lo > fm_lo:
+                bull.append("MACD底背离（价格新低，指标抬底）")
+            elif s_hi > f_hi * 1.01 and sm_hi < fm_hi:
+                bear.append("MACD顶背离（价格新高，指标走低）")
+
     if not bull and not bear:
         return ""
 
-    lines = ["**🎯 买卖信号**"]
-    for s in bull:
-        lines.append(f"▲ {s}")
-    for s in bear:
-        lines.append(f"▼ {s}")
-
     nb, ns = len(bull), len(bear)
+    lines = [f"**🎯 买卖信号**  🟢看涨 {nb}  /  🔴看跌 {ns}"]
+    for s in bull:
+        lines.append(f"🟢 看涨  {s}")
+    for s in bear:
+        lines.append(f"🔴 看跌  {s}")
     if nb >= 3 and ns == 0:
-        conclusion = "多项做多信号共振，可积极关注买入机会。"
+        conclusion = "✅ 多项买入信号共振，可积极介入。"
     elif nb > ns + 1:
-        conclusion = "做多信号偏多，可关注介入时机。"
+        conclusion = "✅ 买入信号偏多，可关注介入时机。"
     elif ns >= 3 and nb == 0:
-        conclusion = "多项做空信号共振，建议规避或减仓。"
+        conclusion = "🚫 多项卖出信号共振，建议规避或减仓。"
     elif ns > nb + 1:
-        conclusion = "做空信号偏多，建议谨慎或观望。"
+        conclusion = "🚫 卖出信号偏多，建议谨慎或观望。"
     elif nb > 0 and ns > 0:
-        conclusion = "多空信号交织，等待方向明确后操作。"
+        conclusion = "⚠️ 多空信号交织，等待方向明确后操作。"
     elif nb > 0:
-        conclusion = "出现做多信号，结合趋势方向确认后可介入。"
+        conclusion = "✅ 出现买入信号，结合趋势确认后可介入。"
     else:
-        conclusion = "出现做空信号，注意控制风险。"
-    lines.append(f"综合  {conclusion}")
+        conclusion = "🚫 出现卖出信号，注意控制风险。"
+    lines.append(f"结论  {conclusion}")
 
     # ── 价位建议 ────────────────────────────────────────────
     try:
@@ -1448,14 +1716,16 @@ def text_trend_kline(df: pd.DataFrame, code: str, name: str,
         m_arrow, monthly_sec = "→", ""
 
     signals_sec = _signal_section(df, cur_price)
+    candle_sec  = _candle_pattern_section(df)
 
     return {
-        "summary": _resonance_summary(d_arrow, w_arrow, m_arrow),
-        "ma":      ma_sec,
-        "signals": signals_sec,
-        "daily":   daily_sec,
-        "weekly":  weekly_sec,
-        "monthly": monthly_sec,
+        "summary":         _resonance_summary(d_arrow, w_arrow, m_arrow),
+        "ma":              ma_sec,
+        "candle_patterns": candle_sec,
+        "signals":         signals_sec,
+        "daily":           daily_sec,
+        "weekly":          weekly_sec,
+        "monthly":         monthly_sec,
     }
 
 

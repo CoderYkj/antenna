@@ -320,11 +320,10 @@ def cmd_learn(args, config):
 
     if not args.dry_run:
         try:
-            from notify.feishu import send_learn_complete
-            webhook_url = config.get("feishu", {}).get("webhook_url", "")
-            send_learn_complete(webhook_url, results, elapsed)
+            from notify import send_learn_complete
+            send_learn_complete(results, elapsed)
         except Exception as _e:
-            print(f"[learn] 飞书通知失败（忽略）: {_e}")
+            print(f"[learn] 通知推送失败（忽略）: {_e}")
 
     sys.exit(1 if failed else 0)
 

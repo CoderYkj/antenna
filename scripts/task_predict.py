@@ -64,7 +64,6 @@ def run():
 
     codes = config["universe"]["watchlist"]
     model_dir = config["model"]["saved_dir"]
-    webhook_url = config.get("feishu", {}).get("webhook_url", "")
 
     from data.fetcher import fetch_stock_hist, fetch_realtime_prices, fetch_intraday_kline, _load_name_map
     from features.builder import build_features
@@ -121,7 +120,7 @@ def run():
                 price_info["low"]    = rt["low"]
                 price_info["open"]   = rt["open"]
             r["price"] = price_info
-            r["name"]  = rt.get("name") or name_map.get(code, code)
+            r["name"]  = rt.get("name") or name_map.get(code, "") or code
 
             # 生成当日分时文字版
             df_intraday = fetch_intraday_kline(code, period_min=10)
@@ -166,9 +165,10 @@ def run():
         log_predictions(now.strftime("%Y-%m-%d"), snapshot)
         print(f"[task_predict] 已写入 {len(snapshot)} 只自选股预测快照（复盘基准）")
 
-    from notify.feishu import send_predict_results
-    ok = send_predict_results(webhook_url, results, now)
-    print("[task_predict] 飞书已推送。" if ok else "[task_predict] 飞书推送失败。")
+    from notify import send_predict_results
+    results_push = send_predict_results(results, now)
+    ok = any(results_push.values()) if results_push else False
+    print(f"[task_predict] 推送{'成功' if ok else '失败'}: {results_push}")
 
 
 if __name__ == "__main__":

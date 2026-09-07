@@ -324,5 +324,41 @@ class FeishuPoller:
             time.sleep(POLL_INTERVAL)
 
 
+_PID_FILE = os.path.join(ROOT, "logs", "feishu_poll.pid")
+
+
+def _acquire_pid_lock():
+    """写入 PID 文件；若已有其他实例运行则退出。"""
+    if os.path.exists(_PID_FILE):
+        try:
+            old_pid = int(open(_PID_FILE).read().strip())
+        except Exception:
+            old_pid = 0
+        if old_pid:
+            import ctypes
+            try:
+                # Windows: OpenProcess 0x0400 = PROCESS_QUERY_INFORMATION
+                handle = ctypes.windll.kernel32.OpenProcess(0x0400, False, old_pid)
+                if handle:
+                    ctypes.windll.kernel32.CloseHandle(handle)
+                    log.warning("[singleton] 已有实例在运行 (PID %d)，退出 (code 2)。", old_pid)
+                    sys.exit(2)
+            except Exception:
+                pass
+    with open(_PID_FILE, "w") as f:
+        f.write(str(os.getpid()))
+
+
+def _release_pid_lock():
+    try:
+        os.remove(_PID_FILE)
+    except Exception:
+        pass
+
+
 if __name__ == "__main__":
-    FeishuPoller().run()
+    _acquire_pid_lock()
+    try:
+        FeishuPoller().run()
+    finally:
+        _release_pid_lock()

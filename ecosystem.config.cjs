@@ -7,6 +7,7 @@ module.exports = {
       interpreter: 'C:/Program Files/nodejs/node.exe',
       restart_delay: 5000,
       max_restarts: 10,
+      stop_exit_codes: [2],
       env: {
         PYTHONUNBUFFERED: '1'
       },

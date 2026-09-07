@@ -233,7 +233,7 @@ def cmd_news(code: str) -> dict:
         return f"「{_stock_label(code)}」新闻获取失败：{e}"
 
     # 只保留与该股直接相关的条目，按日期降序（最新在前）
-    relevant = [(t, s, ip, ig, d) for t, s, ip, ig, d in classified if _is_relevant(t, s)]
+    relevant = [(t, s, ip, ig, d, u) for t, s, ip, ig, d, u in classified if _is_relevant(t, s)]
     relevant.sort(key=lambda x: x[4] or "", reverse=True)
 
     total_raw = len(classified)
@@ -245,9 +245,9 @@ def cmd_news(code: str) -> dict:
             f"（共拉取 {total_raw} 条，均为通用市场资讯）"
         )
 
-    pos_items = [(t, d) for t, s, ip, ig, d in relevant if ip and not ig]
-    neg_items = [(t, d) for t, s, ip, ig, d in relevant if ig]   # 含混合情绪
-    neu_items = [(t, d) for t, s, ip, ig, d in relevant if not ip and not ig]
+    pos_items = [(t, d, u) for t, s, ip, ig, d, u in relevant if ip and not ig]
+    neg_items = [(t, d, u) for t, s, ip, ig, d, u in relevant if ig]   # 含混合情绪
+    neu_items = [(t, d, u) for t, s, ip, ig, d, u in relevant if not ip and not ig]
 
     # 去重：Jaccard 相似度 ≥ 70% 视为同一条
     from features.analyser import _dedup_news
@@ -261,33 +261,36 @@ def cmd_news(code: str) -> dict:
     _news_nm = name_map  # 复用已加载的 name_map
 
     def _replace_codes_in_title(text: str) -> str:
-        """把标题里的 6 位数字代码替换为 名称（代码） 格式。"""
+        """把标题里的 6 位数字代码替换为 名称（代码） 格式。跳过 (XXXXXX.SH/SZ) 格式。"""
         def _sub(m):
             c = m.group(0)
             n = _news_nm.get(c)
             return f"{n}（{c}）" if n else c
-        return _re.sub(r'\b\d{6}\b', _sub, text)
+        return _re.sub(r'\b\d{6}\b(?!\.\s*[A-Z]{2})', _sub, text)
 
-    def _fmt_item(title: str, date_str: str) -> str:
+    def _fmt_item(title: str, date_str: str, url: str = "") -> str:
+        clean = _escape_md(_replace_codes_in_title(title))
         prefix = f"[{date_str}]  " if date_str else ""
-        return f"· {prefix}{_escape_md(_replace_codes_in_title(title))}"
+        if url:
+            return f"· {prefix}[{clean}]({url})"
+        return f"· {prefix}{clean}"
 
     lines = [f"**{safe_name}（{code}）近期消息**　相关 {total_rel} 条 / 共 {total_raw} 条"]
 
     if pos_items:
         lines.append(f"\n**📰 正面消息**（{len(pos_items)} 条）")
-        for title, date_str in pos_items[:10]:
-            lines.append(_fmt_item(title, date_str))
+        for title, date_str, url in pos_items[:10]:
+            lines.append(_fmt_item(title, date_str, url))
 
     if neg_items:
         lines.append(f"\n**🔴 负面消息**（{len(neg_items)} 条）")
-        for title, date_str in neg_items[:10]:
-            lines.append(_fmt_item(title, date_str))
+        for title, date_str, url in neg_items[:10]:
+            lines.append(_fmt_item(title, date_str, url))
 
     if neu_items:
         lines.append(f"\n**📋 中性资讯**（{len(neu_items)} 条）")
-        for title, date_str in neu_items[:10]:
-            lines.append(_fmt_item(title, date_str))
+        for title, date_str, url in neu_items[:10]:
+            lines.append(_fmt_item(title, date_str, url))
 
     try:
         from learning.market_state import load_current_state as _lcs_news
@@ -658,8 +661,7 @@ def cmd_review(date_str: str = None) -> dict:
 
     # 规则说明
     rule_text = (
-        f"**复盘规则**：仅追踪「买入」信号精准率（涨幅≥{RISE_THRESHOLD}%算命中），"
-        "「观望/回避」不计入精准率，避免观望 bias。"
+        f"**复盘规则**：买入命中=涨幅≥{RISE_THRESHOLD}%，观望/回避命中=涨幅<{RISE_THRESHOLD}%（正确回避），全部计入准确率。"
     )
     elements.append({"tag": "markdown", "content": rule_text})
     elements.append({"tag": "hr"})
@@ -706,7 +708,7 @@ def cmd_review(date_str: str = None) -> dict:
         rec_lines = ["**📊 推荐股复盘**"]
 
         if rec_buy:
-            rec_lines.append("买入信号（计入精准率）")
+            rec_lines.append("买入信号（计入准确率）")
             for d in rec_buy:
                 code  = d["code"]
                 dname = _rname(d)
@@ -721,22 +723,24 @@ def cmd_review(date_str: str = None) -> dict:
                 )
 
         if rec_watch:
-            rec_lines.append("观望/回避（不计入精准率）")
+            rec_lines.append("观望/回避（计入准确率）")
             for d in rec_watch:
                 code  = d["code"]
                 dname = _rname(d)
                 prob  = d.get("rise_prob", 0)
                 apct  = d.get("actual_pct")
+                hit   = d.get("hit")
+                hit_icon = "✅" if hit is True else ("❌" if hit is False else "⬜")
                 apct_str = f"{apct:+.2f}%" if apct is not None else "待结算"
                 rec_lines.append(
-                    f"· ⬜ {dname}（{code}）  "
+                    f"· {hit_icon} {dname}（{code}）  "
                     f"涨概率 {prob:.1%}  实际 {apct_str}"
                 )
 
-        rec_hits  = sum(1 for d in rec_buy if d.get("hit") is True)
-        rec_total = sum(1 for d in rec_buy if d.get("hit") is not None)
+        rec_hits  = sum(1 for d in rec_details if d.get("hit") is True)
+        rec_total = sum(1 for d in rec_details if d.get("hit") is not None)
         rec_lines.append("")
-        rec_lines.append(_acc_bar_line(rec_hits, rec_total, "推荐股精准率"))
+        rec_lines.append(_acc_bar_line(rec_hits, rec_total, "推荐股准确率"))
 
         elements.append({"tag": "markdown", "content": "\n".join(rec_lines)})
 
@@ -761,7 +765,7 @@ def cmd_review(date_str: str = None) -> dict:
                 )
 
             wl_lines.append("")
-            wl_lines.append(_acc_bar_line(wl_hits, wl_total, "自选股精准率"))
+            wl_lines.append(_acc_bar_line(wl_hits, wl_total, "自选股准确率"))
             elements.append({"tag": "markdown", "content": "\n".join(wl_lines)})
 
         elements.append({"tag": "hr"})
@@ -773,12 +777,12 @@ def cmd_review(date_str: str = None) -> dict:
         acc_day = day_result["accuracy"]
         acc_color = "✅" if acc_day >= 0.85 else ("⚠️" if acc_day >= 0.70 else "❌")
         acc_text = (
-            f"综合精准率（推荐+自选）{acc_color} **{acc_day:.0%}**（{hits}/{total} 命中）\n"
-            f"7日精准率：**{acc_7d:.0%}**（{samples_7}条样本）　"
-            f"30日精准率：**{acc_30d:.0%}**（{samples_30}条样本）"
+            f"综合准确率（推荐+自选）{acc_color} **{acc_day:.0%}**（{hits}/{total} 命中）\n"
+            f"7日准确率：**{acc_7d:.0%}**（{samples_7}条样本）　"
+            f"30日准确率：**{acc_30d:.0%}**（{samples_30}条样本）"
         )
     else:
-        acc_text = f"当日无买入信号，7日精准率：**{acc_7d:.0%}**　30日精准率：**{acc_30d:.0%}**"
+        acc_text = f"当日无信号数据，7日准确率：**{acc_7d:.0%}**　30日准确率：**{acc_30d:.0%}**"
 
     elements.append({"tag": "markdown", "content": acc_text})
     elements.append({"tag": "hr"})
@@ -1110,6 +1114,8 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
             log.exception("[推荐] 后台扫描失败")
             result = {"msg_type": "text", "content": json.dumps(
                 {"text": f"推荐扫描失败：{e}"}, ensure_ascii=False)}
+        if result is None:
+            return  # 数据未就绪或已去重，静默跳过
         from server.feishu_push import push as _push
         _push(result)
 
@@ -1143,6 +1149,11 @@ def _cmd_scan_bot_impl(top_n: int = 5) -> dict:
         codes = cached_codes()
     else:
         codes = load_universe(cfg)
+
+    # 全量缓存模式下，缓存不足时静默跳过，避免推送无意义的空结果
+    if pool_cfg == "all" and len(codes) < 50:
+        log.warning("[推荐] 缓存仅 %d 只，跳过扫描推送", len(codes))
+        return None
 
     # 自选股（用于额外快照）
     watchlist = set(cfg.get("universe", {}).get("watchlist", []))
@@ -1183,11 +1194,11 @@ def _cmd_scan_bot_impl(top_n: int = 5) -> dict:
     workers = cfg.get("scan", {}).get("workers", 8)
     total   = len(codes)
 
-    # 拉取 alt_data 特征（失败不阻断扫描）
+    # 拉取 alt_data 特征（cache_only：只用 task_scan 预热的缓存，避免逐股慢拉）
     today_str = _today()
     try:
         from data.alt_fetcher import fetch_alt_features
-        alt_cache = fetch_alt_features(codes, today_str)
+        alt_cache = fetch_alt_features(codes, today_str, cache_only=True)
     except Exception as _alt_err:
         log.warning(f"[scan_bot] alt_data fetch failed, proceeding without alt features: {_alt_err}")
         alt_cache = {}
@@ -1231,6 +1242,15 @@ def _cmd_scan_bot_impl(top_n: int = 5) -> dict:
     from models.predictor import assign_global_signals
     assign_global_signals(results, buy_top_pct)
 
+    # 模型退化检测：取任意一条结果中缓存的 max_cal_prob
+    _max_cal_prob = results[0].get("max_cal_prob", 1.0) if results else 1.0
+    try:
+        from learning.model_learner import load_abs_threshold
+        _abs_threshold = load_abs_threshold()
+    except Exception:
+        _abs_threshold = 0.30
+    _model_degraded = _max_cal_prob < _abs_threshold
+
     # 持久化全市场门槛，供 cmd_predict 单股查询时使用（无需重新全量扫描）
     _n_total = len(results)
     _all_probs_desc = sorted([r["rise_prob"] for r in results], reverse=True)
@@ -1245,10 +1265,33 @@ def _cmd_scan_bot_impl(top_n: int = 5) -> dict:
     _s["last_scan_date"]    = _today()
     save_strategy(_s)
 
-    # 候选池：取 AI 高分股（按 rise_prob+momentum 降序），不预过滤信号
-    # 战法评分从这里筛选有共振的股票；AI 买入信号数仅作展示参考
+    # 候选池：优先选财务缓存命中 + 预筛分高的买入股，无缓存则按 AI 分补充
+    # 目标：从全部买入信号中找既有 AI 信号又有基本面支撑的股票送去战法评分
     n_buy = sum(1 for r in results if r.get("signal") == "买入")
-    top = results[:top_n * 4]
+    pool_size = top_n * 4
+    try:
+        from data.fin_cache import get as _fc_get, score as _fc_score
+        buy_pool  = [r for r in results if r.get("signal") == "买入"]
+        cached_ok, uncached = [], []
+        for r in buy_pool:
+            entry = _fc_get(r["code"])
+            if entry is not None:
+                cached_ok.append((r, _fc_score(entry)))
+            else:
+                uncached.append(r)
+        # 缓存命中者：按预筛分 desc、AI 分 desc 排序
+        cached_ok.sort(key=lambda x: (x[1], x[0].get("rise_prob", 0.0)), reverse=True)
+        top_cached   = [r for r, _ in cached_ok][:pool_size]
+        top_uncached = uncached[: max(0, pool_size - len(top_cached))]
+        top = (top_cached + top_uncached)[:pool_size]
+        # 买入信号不足时从全量 AI 高分补齐（含观望股，保持原逻辑兜底）
+        if len(top) < pool_size:
+            seen = {r["code"] for r in top}
+            top += [r for r in results if r["code"] not in seen][: pool_size - len(top)]
+        _uncached_codes = [r["code"] for r in uncached]
+    except Exception:
+        top = results[:pool_size]
+        _uncached_codes = []
 
     # 补充实时行情
     top_codes = [r["code"] for r in top]
@@ -1268,14 +1311,43 @@ def _cmd_scan_bot_impl(top_n: int = 5) -> dict:
         rt = rt_map.get(r["code"], {})
         if rt:
             r["price_info"].update({k: rt[k] for k in ("price", "pct", "high", "low", "open") if k in rt})
-            r["name"] = rt.get("name") or name_map.get(r["code"], r["code"])
+            r["name"] = rt.get("name") or name_map.get(r["code"], "") or r["code"]
         else:
-            r["name"] = name_map.get(r["code"], r["code"])
+            r["name"] = name_map.get(r["code"], "") or r["code"]
         r["trade"]      = suggest_trade_levels(r["last"], r["price_info"], r["rise_prob"])
         r["dual_trade"] = suggest_dual_period_trades(r["last"], r["price_info"], r["rise_prob"])
 
     # 战法多维评分（并行拉取 top-N 财务数据，追加战法标签）
     top = _enrich_tactic_scores(top, workers=workers)
+
+    # 战法评分完成后：把新鲜财务数据批量写回缓存（后台，不阻塞推荐路径）
+    try:
+        from data.fin_cache import put_batch as _fc_put
+        _fc_updates = {r["code"]: r["fin_res"] for r in top if r.get("fin_res")}
+        if _fc_updates:
+            import threading as _fct
+            _fct.Thread(target=_fc_put, args=(_fc_updates,), daemon=True).start()
+    except Exception:
+        pass
+
+    # 后台预取：对本轮未命中缓存的买入信号股静默拉取财务数据，加速下次预筛
+    if _uncached_codes:
+        def _bg_prefetch(prefetch_codes: list[str]) -> None:
+            from data.fetcher import fetch_financial_data
+            from features.fundamental import analyse_financials
+            from data.fin_cache import put_batch as _fc_put2
+            updates: dict = {}
+            for code in prefetch_codes[:40]:  # 每次最多补充 40 只，约 80-200s
+                try:
+                    res = analyse_financials(fetch_financial_data(code))
+                    if res:
+                        updates[code] = res
+                except Exception:
+                    pass
+            if updates:
+                _fc_put2(updates)
+        import threading as _bgt
+        _bgt.Thread(target=_bg_prefetch, args=(_uncached_codes,), daemon=True).start()
 
     # P2 D3:共振股调 rank_pct,重排 top 让共振股前移
     _apply_resonance_boost(top)
@@ -1332,35 +1404,6 @@ def _cmd_scan_bot_impl(top_n: int = 5) -> dict:
             "scene":           "scan",
         })
 
-    # 自选股中未入 Top N 的，额外写快照（标记 watchlist=True）
-    top_code_set = {r["code"] for r in top}
-    wl_extra_codes = [c for c in watchlist if c not in top_code_set]
-    if wl_extra_codes:
-        wl_results_map = {r["code"]: r for r in results if r["code"] in wl_extra_codes}
-        for code in wl_extra_codes:
-            r = wl_results_map.get(code)
-            if r:
-                _wl_name = r.get("name", "")
-                if not _wl_name or _wl_name == code:
-                    _wl_name = name_map.get(code, code)
-                snapshot.append({
-                    "code":            code,
-                    "name":            _wl_name,
-                    "signal":          r.get("signal", "观望"),
-                    "rise_prob":       round(r["rise_prob"], 4),
-                    "confidence":      r.get("confidence", ""),
-                    "global_rank":     r.get("global_rank", 0),
-                    "global_rank_pct": r.get("global_rank_pct", 1.0),
-                    "scan_total":      _n_total,
-                    "recommended":     False,
-                    "scan_date":       scan_date,
-                    "pred_high":       r["price_info"].get("pred_high"),
-                    "pred_low":        r["price_info"].get("pred_low"),
-                    "market_state":    _current_state,
-                    "watchlist":  True,
-                    "scene":      "scan",
-                })
-
     log_predictions(pred_date, snapshot)
 
     # ── 构建飞书卡片 ──────────────────────────────────────
@@ -1377,10 +1420,18 @@ def _cmd_scan_bot_impl(top_n: int = 5) -> dict:
 
     # 主推荐为空时：展示"值得关注"卡片（观望+战法认可）或灰色空卡片
     if not top:
+        if _model_degraded:
+            _no_signal_reason = (
+                f"⚠️ 模型信号退化（全量最高校准概率 {_max_cal_prob:.1%} < 门槛 {_abs_threshold:.0%}），"
+                f"推荐暂停。建议重新训练模型（`python cli.py train`）后再扫描。\n"
+            )
+        else:
+            _no_signal_reason = (
+                f"今日无买入信号，" + ("以下为战法认可的观望标的，供候选参考。\n" if tier_watch else "建议观望。\n")
+            )
         _watch_elements = [{"tag": "markdown", "content": (
             f"共扫描 **{total}** 只，AI 买入信号 **{n_buy}** 只。\n"
-            + (f"今日无买入信号，以下为战法认可的观望标的，供候选参考。\n" if tier_watch
-               else f"今日暂无战法认可的推荐股票，建议观望。\n")
+            + _no_signal_reason
             + f"市场状态 **{_current_state}**{_active_cnt_str}"
         )}]
         if tier_watch:
@@ -1412,7 +1463,7 @@ def _cmd_scan_bot_impl(top_n: int = 5) -> dict:
             "config": {"wide_screen_mode": True},
             "header": {
                 "title": {"tag": "plain_text", "content": f"Antenna 推荐　{scan_date}"},
-                "template": "yellow" if tier_watch else "grey",
+                "template": "red" if _model_degraded else ("yellow" if tier_watch else "grey"),
             },
             "elements": _watch_elements,
         }
@@ -2740,7 +2791,7 @@ def cmd_trend(code: str) -> dict:
     elements: list[dict] = [
         {"tag": "markdown", "content": sections["summary"]},
     ]
-    for key in ("ma", "signals", "daily", "weekly", "monthly"):
+    for key in ("ma", "candle_patterns", "signals", "daily", "weekly", "monthly"):
         sec = sections.get(key, "")
         if sec:
             elements.append({"tag": "hr"})
@@ -2871,5 +2922,93 @@ def cmd_learn(arg: str | None, chat_id: str = "") -> str:
     return (
         f"🤖 开始学习 · {date_display} · 模式: {mode_text}\n"
         f"后台运行中,完成后会主动推送结果。"
+    )
+
+
+# ── 训练指令 ─────────────────────────────────────────────────
+
+def _run_train_async(*, weighted: bool, chat_id: str) -> None:
+    """后台执行完整模型训练并推回源 chat。"""
+    import time
+    from datetime import datetime
+    t0 = time.time()
+    date_display = datetime.now().strftime("%Y-%m-%d")
+    try:
+        import pandas as pd
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        from data.fetcher import fetch_stock_hist
+        from data.universe import load_universe
+        from features.builder import build_features
+        from features.technical import FEATURE_COLS
+        from models.trainer import build_labels, train, save_model
+
+        cfg = _load_cfg()
+        codes = load_universe(cfg)
+        days = cfg["data"]["default_days"]
+        target_days = cfg["model"]["target_days"]
+        threshold = cfg["model"]["threshold"]
+
+        def _load_one(code):
+            df = fetch_stock_hist(code, days=days, cache_only=True)
+            df = build_features(df)
+            df["label"] = build_labels(df, target_days=target_days, threshold=threshold)
+            df["code"] = code
+            return df
+
+        dfs, fail = [], 0
+        total = len(codes)
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futures = {pool.submit(_load_one, c): c for c in codes}
+            for future in as_completed(futures):
+                try:
+                    dfs.append(future.result())
+                except Exception:
+                    fail += 1
+
+        combined = pd.concat(dfs, ignore_index=True)
+
+        if weighted:
+            from learning.model_learner import retrain_with_weights
+            model = retrain_with_weights(combined, feature_cols=FEATURE_COLS)
+            mode_text = "加权重训"
+        else:
+            model = train(combined, feature_cols=FEATURE_COLS)
+            mode_text = "全量训练"
+
+        save_model(model, saved_dir=cfg["model"]["saved_dir"])
+        elapsed = time.time() - t0
+
+        msg = (
+            f"✅ 训练完成 · {date_display} · {mode_text}\n"
+            f"股票 {len(dfs)} 只（跳过 {fail}）· 样本 {len(combined):,} 行 · 耗时 {elapsed:.0f}s\n"
+            f"建议随后执行「学习」更新校准器和门槛。"
+        )
+    except Exception as e:
+        elapsed = time.time() - t0
+        msg = f"❌ 训练异常 · {date_display}\n{type(e).__name__}: {e}"
+
+    if chat_id:
+        push(msg, chat_ids=[chat_id])
+
+
+def cmd_train(arg: str | None, chat_id: str = "") -> str:
+    """飞书"训练"指令:立即返回 ACK → 后台跑全量模型训练。
+
+    用法:
+      训练          - 普通训练
+      训练 加权      - 错样本加权重训(P1)
+    """
+    weighted = arg is not None and arg.strip() in ("加权", "weighted", "--weighted")
+
+    mode_text = "加权重训" if weighted else "全量训练"
+    threading.Thread(
+        target=_run_train_async,
+        kwargs={"weighted": weighted, "chat_id": chat_id},
+        daemon=True,
+    ).start()
+
+    return (
+        f"🏋 开始{mode_text} · 后台运行中（预计 10-20 分钟）\n"
+        f"完成后会主动推送结果，请勿重复发送。"
     )
 

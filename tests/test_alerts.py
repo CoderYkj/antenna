@@ -32,37 +32,32 @@ def test_severity_defaults_to_error(alerts_dir):
     assert data["severity"] == "error"
 
 
-def test_push_to_feishu_not_called_when_no_webhook(alerts_dir, monkeypatch):
-    called = []
-
-    def fake_push(hook, msg):
-        called.append(msg)
-
-    monkeypatch.setattr(alerts, "_push_feishu", fake_push)
-    monkeypatch.setattr(alerts, "_get_webhook", lambda: "")
-    alerts.send_alert("market_state", "failed")
-    assert called == []
-
-
-def test_send_alert_calls_push_when_webhook_present(alerts_dir, monkeypatch):
+def test_push_alert_called_on_send_alert(alerts_dir, monkeypatch):
     pushed = []
-    monkeypatch.setattr(alerts, "_push_feishu", lambda hook, msg: pushed.append((hook, msg)))
-    monkeypatch.setattr(alerts, "_get_webhook", lambda: "https://hook.example")
+    monkeypatch.setattr(alerts, "_push_alert", lambda msg: pushed.append(msg) or True)
+    alerts.send_alert("market_state", "failed")
+    assert len(pushed) == 1
+    assert "market_state" in pushed[0]
+
+
+def test_send_alert_calls_push_alert_with_message(alerts_dir, monkeypatch):
+    pushed = []
+    monkeypatch.setattr(alerts, "_push_alert", lambda msg: pushed.append(msg) or True)
     alerts.send_alert("market_state", "failed: connection refused")
     assert len(pushed) == 1
-    assert "market_state" in pushed[0][1]
+    assert "market_state" in pushed[0]
 
 
 def test_send_alert_writes_jsonl_even_without_webhook(alerts_dir, monkeypatch):
-    """无 webhook 时仍应写入 alerts.jsonl。"""
-    monkeypatch.setattr(alerts, "_get_webhook", lambda: "")
+    """无推送通道时仍应写入 alerts.jsonl。"""
+    monkeypatch.setattr(alerts, "_push_alert", lambda msg: False)
     alerts.send_alert("m", "boom")
     assert (alerts_dir / "alerts.jsonl").exists()
 
 
 def test_send_alert_with_traceback_includes_format_exc(alerts_dir, monkeypatch):
     """traceback=True 时应在 message 中包含 traceback 文本(模拟异常栈)。"""
-    monkeypatch.setattr(alerts, "_get_webhook", lambda: "")
+    monkeypatch.setattr(alerts, "_push_alert", lambda msg: False)
     try:
         raise ValueError("synthetic")
     except ValueError:

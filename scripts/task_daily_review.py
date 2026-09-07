@@ -121,13 +121,13 @@ def run():
 
     # ── 推送飞书 ──────────────────────────────────────────
     webhook = cfg.get("feishu", {}).get("webhook_url", "")
-    if not webhook:
-        print("[review] 未配置 webhook，跳过推送。")
-        return
-
-    from notify.feishu import send_review_report
-    ok = send_review_report(webhook, report)
-    print("[review] 飞书推送成功。" if ok else "[review] 飞书推送失败。")
+    from notify import send_review_report
+    push_results = send_review_report(report)
+    ok = any(push_results.values()) if push_results else False
+    if not ok and not webhook:
+        print("[review] 未配置通道，跳过推送。")
+    else:
+        print(f"[review] 推送{'成功' if ok else '失败'}: {push_results}")
 
     # ── 调用学习编排器 ──────────────────────────────────
     print("[review] 启动学习管线 ...")

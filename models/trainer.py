@@ -9,14 +9,15 @@ from sklearn.metrics import roc_auc_score
 
 # ── LightGBM 参数(集中管理,原 train/train_weighted 内联常量) ──
 _LGB_PARAMS = {
-    "objective":     "binary",
-    "metric":        "auc",
-    "learning_rate": 0.05,
-    "num_leaves":    31,
-    "verbose":       -1,
+    "objective":        "binary",
+    "metric":           "auc",
+    "learning_rate":    0.01,    # 低学习率：大数据集需更多轮次，避免 7 轮就早停
+    "num_leaves":       63,      # 更多叶子：增加输出概率的离散度（原 31 → 4 个值）
+    "min_data_in_leaf": 200,     # 每叶最少样本：防止对单只股票过拟合
+    "verbose":          -1,
 }
-_NUM_BOOST_ROUND   = 200
-_EARLY_STOP_ROUNDS = 30
+_NUM_BOOST_ROUND   = 500   # 最大轮次（原 200；低学习率需要更多轮）
+_EARLY_STOP_ROUNDS = 50    # 早停轮次（原 30；与 500 轮匹配）
 _LOG_EVERY_ROUNDS  = 50
 
 

@@ -24,10 +24,23 @@ def main():
     with open("config.yaml", encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
-    webhook_url = config.get("feishu", {}).get("webhook_url", "")
     top_n = config.get("feishu", {}).get("scan_top", 20)
 
     print(f"[task_scan] 开始扫描 Top {top_n} ...")
+
+    # 预热 alt_data 缓存（bot 扫描路径 cache_only=True，依赖此处提前拉取）
+    from datetime import datetime
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    try:
+        from data.fetcher import cached_codes
+        from data.alt_fetcher import fetch_alt_features
+        all_codes = cached_codes()
+        if all_codes:
+            print(f"[task_scan] 预热 alt_data 缓存 {len(all_codes)} 只 ...")
+            fetch_alt_features(all_codes, today_str)
+            print(f"[task_scan] alt_data 缓存预热完成")
+    except Exception as _e:
+        print(f"[task_scan] alt_data 预热失败（不影响扫描）: {_e}")
 
     import argparse
     from cli import cmd_scan
@@ -38,20 +51,18 @@ def main():
         print("[task_scan] cmd_scan 无返回值，推送跳过。")
         return
 
-    print(f"[task_scan] 扫描完成，推送飞书 ...")
-    from notify.feishu import send_scan_result
-    ok = send_scan_result(webhook_url, scan_result)
+    print(f"[task_scan] 扫描完成，推送通知 ...")
+    from notify import send_scan_result
+    results = send_scan_result(scan_result)
+    ok = any(results.values()) if results else False
     if ok:
-        print("[task_scan] 飞书通知已发送。")
-    elif webhook_url:
-        print("[task_scan] 飞书通知发送失败。")
+        print(f"[task_scan] 推送成功: {results}")
     else:
-        print("[task_scan] 未配置 webhook_url，跳过推送。")
+        print(f"[task_scan] 推送失败或未配置通道: {results}")
 
     # ── 写入扫描预测快照（与自选股合并，供复盘使用）────────
     from learning.tracker import log_predictions
     from learning.optimizer import load_strategy
-    from datetime import datetime
     buy_threshold = load_strategy().get("buy_threshold", 0.60)
     snapshot = []
     for r in scan_result.get("top", []):

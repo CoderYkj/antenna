@@ -76,3 +76,20 @@ pm2_monitor:
 # 可选;启用后 cmd_scan_bot 的 Top-N 每股调一次 LLM(缓存 24h;日封顶 50 次)
 ai_reason:
   enable:       true                  # false 则 cmd_scan_bot 不调 LLM
+
+# ── 多通道总开关 ──────────────────────────────────────────
+channels:
+  feishu:  true    # 飞书（默认开，保持现有行为）
+  wecom:   false   # 企业微信（配置好凭据后改为 true）
+
+# ── 企业微信自建应用 ───────────────────────────────────────
+wecom:
+  corp_id:          ""    # 我的企业 → 企业信息 → 企业ID
+  agent_id:         0     # 自建应用 → AgentId（整数）
+  secret:           ""    # 自建应用 → Secret
+  # ↓ Phase 3 专属（双向对话，需公网 HTTPS）
+  callback_token:   ""    # 接收消息 → Token
+  encoding_aes_key: ""    # 接收消息 → EncodingAESKey（43位）
+  callback_port:    5000
+  callback_path:    /wecom/callback
+  allowed_users:    []    # 指令白名单，空列表=不限制

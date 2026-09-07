@@ -1,46 +1,662 @@
 {
-  "abs_threshold": 0.34,
-  "last_calibrated": "2026-05-09T15:13:03",
+  "abs_threshold": 0.2104,
+  "last_calibrated": "2026-09-04T15:33:05",
   "last_retrained": null,
-  "model_file": "models\\saved\\model_20260508.pkl",
-  "model_sha": "3d811694316d",
+  "model_file": "models\\saved\\model_20260904.pkl",
+  "model_sha": "7d73f350f403",
   "calibrators": {
     "bull": {
-      "samples": 568,
-      "brier_before": 0.2184,
-      "brier_after": 0.1892,
+      "samples": 244,
+      "brier_before": 0.2008,
+      "brier_after": 0.1899,
       "status": "ok",
-      "used_fallback_global": true
+      "used_fallback_global": false
     },
     "bear": {
-      "samples": 568,
-      "brier_before": 0.2184,
-      "brier_after": 0.1892,
+      "samples": 279,
+      "brier_before": 0.2023,
+      "brier_after": 0.1897,
       "status": "ok",
-      "used_fallback_global": true
+      "used_fallback_global": false
     },
     "range": {
-      "samples": 568,
-      "brier_before": 0.2184,
-      "brier_after": 0.1892,
+      "samples": 510,
+      "brier_before": 0.1965,
+      "brier_after": 0.1837,
       "status": "ok",
       "used_fallback_global": false
     }
   },
   "threshold_history": [
     {
-      "date": "2026-05-08",
-      "acc_30d": 0.2012,
-      "buy_signals": 169,
-      "abs_threshold": 0.32,
-      "change": "0.30 → 0.32: acc_30d 0.201 < 35%, 收严"
+      "date": "2026-05-11",
+      "acc_30d": 0.1701,
+      "buy_signals": 147,
+      "abs_threshold": 0.54,
+      "change": "0.52 → 0.54: acc_30d 0.170 < 35%, 收严"
+    },
+    {
+      "date": "2026-05-11",
+      "acc_30d": 0.1701,
+      "buy_signals": 147,
+      "abs_threshold": 0.6,
+      "change": "0.60 → 0.60: acc_30d 0.170 < 35%, 收严 (clamped)"
+    },
+    {
+      "date": "2026-05-11",
+      "acc_30d": 0.1701,
+      "buy_signals": 147,
+      "abs_threshold": 0.6,
+      "change": "0.60 → 0.60: acc_30d 0.170 < 35%, 收严 (clamped)"
+    },
+    {
+      "date": "2026-05-11",
+      "acc_30d": 0.1701,
+      "buy_signals": 147,
+      "abs_threshold": 0.6,
+      "change": "0.60 → 0.60: acc_30d 0.170 < 35%, 收严 (clamped)"
+    },
+    {
+      "date": "2026-05-12",
+      "acc_30d": 0.1646,
+      "buy_signals": 158,
+      "abs_threshold": 0.6,
+      "change": "0.60 → 0.60: acc_30d 0.165 < 35%, 收严 (clamped)"
+    },
+    {
+      "date": "2026-05-13",
+      "acc_30d": 0.1646,
+      "buy_signals": 158,
+      "abs_threshold": 0.6,
+      "change": "0.60 → 0.60: acc_30d 0.165 < 35%, 收严 (clamped)"
+    },
+    {
+      "date": "2026-05-14",
+      "acc_30d": 0.1622,
+      "buy_signals": 148,
+      "abs_threshold": 0.6,
+      "change": "0.60 → 0.60: acc_30d 0.162 < 35%, 收严 (clamped)"
+    },
+    {
+      "date": "2026-05-15",
+      "acc_30d": 0.1739,
+      "buy_signals": 138,
+      "abs_threshold": 0.6,
+      "change": "0.60 → 0.60: acc_30d 0.174 < 35%, 收严 (clamped)"
+    },
+    {
+      "date": "2026-05-18",
+      "acc_30d": 0.213,
+      "buy_signals": 108,
+      "abs_threshold": 0.6,
+      "change": "0.60 → 0.60: acc_30d 0.213 < 35%, 收严 (clamped)"
+    },
+    {
+      "date": "2026-05-19",
+      "acc_30d": 0.213,
+      "buy_signals": 108,
+      "abs_threshold": 0.6,
+      "change": "0.60 → 0.60: acc_30d 0.213 < 35%, 收严 (clamped)"
+    },
+    {
+      "date": "2026-05-20",
+      "acc_30d": 0.213,
+      "buy_signals": 108,
+      "abs_threshold": 0.6,
+      "change": "0.60 → 0.60: acc_30d 0.213 < 35%, 收严 (clamped)"
+    },
+    {
+      "date": "2026-05-21",
+      "acc_30d": 0.2041,
+      "buy_signals": 98,
+      "abs_threshold": 0.6,
+      "change": "0.60 → 0.60: acc_30d 0.204 < 35%, 收严 (clamped)"
+    },
+    {
+      "date": "2026-05-21",
+      "acc_30d": 0.2041,
+      "buy_signals": 98,
+      "abs_threshold": 0.6,
+      "change": "0.60 → 0.60: acc_30d 0.204 < 35%, 收严 (clamped)"
+    },
+    {
+      "date": "2026-05-25",
+      "acc_30d": 0.4247,
+      "buy_signals": 73,
+      "abs_threshold": 0.22,
+      "change": "0.22 → 0.22: acc_30d 0.425 维持区间"
+    },
+    {
+      "date": "2026-05-26",
+      "acc_30d": 0.4247,
+      "buy_signals": 73,
+      "abs_threshold": 0.07,
+      "change": "0.07 → 0.07: acc_30d 0.425 维持区间"
+    },
+    {
+      "date": "2026-05-27",
+      "acc_30d": 0.3974,
+      "buy_signals": 78,
+      "abs_threshold": 0.2002,
+      "change": "0.20 → 0.20: acc_30d 0.397 维持区间"
+    },
+    {
+      "date": "2026-05-28",
+      "acc_30d": 0.3333,
+      "buy_signals": 93,
+      "abs_threshold": 0.214,
+      "change": "0.19 → 0.21: acc_30d 0.333 < 35%, 收严"
+    },
+    {
+      "date": "2026-05-29",
+      "acc_30d": 0.3367,
+      "buy_signals": 98,
+      "abs_threshold": 0.2129,
+      "change": "0.19 → 0.21: acc_30d 0.337 < 35%, 收严"
+    },
+    {
+      "date": "2026-06-01",
+      "acc_30d": 0.3077,
+      "buy_signals": 91,
+      "abs_threshold": 0.1918,
+      "change": "0.19 → 0.19: acc_30d 0.308 < 35%, 收严 (cal_max_cap=0.1918)"
+    },
+    {
+      "date": "2026-06-02",
+      "acc_30d": 0.3267,
+      "buy_signals": 101,
+      "abs_threshold": 0.2318,
+      "change": "0.21 → 0.23: acc_30d 0.327 < 35%, 收严"
+    },
+    {
+      "date": "2026-06-03",
+      "acc_30d": 0.3113,
+      "buy_signals": 106,
+      "abs_threshold": 0.2125,
+      "change": "0.21 → 0.21: acc_30d 0.311 < 35%, 收严 (cal_max_cap=0.2125)"
+    },
+    {
+      "date": "2026-06-04",
+      "acc_30d": 0.2973,
+      "buy_signals": 111,
+      "abs_threshold": 0.2325,
+      "change": "0.21 → 0.23: acc_30d 0.297 < 35%, 收严"
+    },
+    {
+      "date": "2026-06-05",
+      "acc_30d": 0.288,
+      "buy_signals": 125,
+      "abs_threshold": 0.2525,
+      "change": "0.23 → 0.25: acc_30d 0.288 < 35%, 收严"
+    },
+    {
+      "date": "2026-06-06",
+      "acc_30d": 0.2689,
+      "buy_signals": 119,
+      "abs_threshold": 0.1884,
+      "change": "0.25 → 0.19: acc_30d 0.269 < 35%, 收严 (cal_max_cap=0.1884)"
     },
     {
       "date": "2026-04-27",
-      "acc_30d": 0.1842,
+      "acc_30d": 0.3053,
       "buy_signals": 190,
-      "abs_threshold": 0.34,
-      "change": "0.32 → 0.34: acc_30d 0.184 < 35%, 收严"
+      "abs_threshold": 0.2484,
+      "change": "0.23 → 0.25: acc_30d 0.305 < 35%, 收严"
+    },
+    {
+      "date": "2026-06-08",
+      "acc_30d": 0.2453,
+      "buy_signals": 106,
+      "abs_threshold": 0.1876,
+      "change": "0.25 → 0.19: acc_30d 0.245 < 35%, 收严 (cal_max_cap=0.1876)"
+    },
+    {
+      "date": "2026-06-09",
+      "acc_30d": 0.2432,
+      "buy_signals": 111,
+      "abs_threshold": 0.2076,
+      "change": "0.19 → 0.21: acc_30d 0.243 < 35%, 收严"
+    },
+    {
+      "date": "2026-06-10",
+      "acc_30d": 0.4174,
+      "buy_signals": 218,
+      "abs_threshold": 0.2076,
+      "change": "0.21 → 0.21: acc_30d 0.417 维持区间"
+    },
+    {
+      "date": "2026-06-11",
+      "acc_30d": 0.4163,
+      "buy_signals": 209,
+      "abs_threshold": 0.2076,
+      "change": "0.21 → 0.21: acc_30d 0.416 维持区间"
+    },
+    {
+      "date": "2026-06-12",
+      "acc_30d": 0.4341,
+      "buy_signals": 205,
+      "abs_threshold": 0.2076,
+      "change": "0.21 → 0.21: acc_30d 0.434 维持区间"
+    },
+    {
+      "date": "2026-06-15",
+      "acc_30d": 0.4254,
+      "buy_signals": 181,
+      "abs_threshold": 0.2076,
+      "change": "0.21 → 0.21: acc_30d 0.425 维持区间"
+    },
+    {
+      "date": "2026-06-16",
+      "acc_30d": 0.4301,
+      "buy_signals": 186,
+      "abs_threshold": 0.2076,
+      "change": "0.21 → 0.21: acc_30d 0.430 维持区间"
+    },
+    {
+      "date": "2026-06-17",
+      "acc_30d": 0.4301,
+      "buy_signals": 186,
+      "abs_threshold": 0.2076,
+      "change": "0.21 → 0.21: acc_30d 0.430 维持区间"
+    },
+    {
+      "date": "2026-06-18",
+      "acc_30d": 0.4254,
+      "buy_signals": 181,
+      "abs_threshold": 0.2076,
+      "change": "0.21 → 0.21: acc_30d 0.425 维持区间"
+    },
+    {
+      "date": "2026-06-19",
+      "acc_30d": 0.4211,
+      "buy_signals": 171,
+      "abs_threshold": 0.2076,
+      "change": "0.21 → 0.21: acc_30d 0.421 维持区间"
+    },
+    {
+      "date": "2026-06-22",
+      "acc_30d": 0.4468,
+      "buy_signals": 141,
+      "abs_threshold": 0.2076,
+      "change": "0.21 → 0.21: acc_30d 0.447 维持区间"
+    },
+    {
+      "date": "2026-06-23",
+      "acc_30d": 0.4333,
+      "buy_signals": 150,
+      "abs_threshold": 0.2076,
+      "change": "0.21 → 0.21: acc_30d 0.433 维持区间"
+    },
+    {
+      "date": "2026-06-24",
+      "acc_30d": 0.4258,
+      "buy_signals": 155,
+      "abs_threshold": 0.1859,
+      "change": "0.21 → 0.19: acc_30d 0.426 维持区间 (cal_max_cap=0.1859)"
+    },
+    {
+      "date": "2026-06-25",
+      "acc_30d": 0.4207,
+      "buy_signals": 145,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.421 维持区间"
+    },
+    {
+      "date": "2026-06-26",
+      "acc_30d": 0.4148,
+      "buy_signals": 135,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.415 维持区间"
+    },
+    {
+      "date": "2026-06-29",
+      "acc_30d": 0.419,
+      "buy_signals": 105,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.419 维持区间"
+    },
+    {
+      "date": "2026-06-30",
+      "acc_30d": 0.419,
+      "buy_signals": 105,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.419 维持区间"
+    },
+    {
+      "date": "2026-07-01",
+      "acc_30d": 0.419,
+      "buy_signals": 105,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.419 维持区间"
+    },
+    {
+      "date": "2026-07-02",
+      "acc_30d": 0.419,
+      "buy_signals": 105,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.419 维持区间"
+    },
+    {
+      "date": "2026-07-03",
+      "acc_30d": 0.4316,
+      "buy_signals": 95,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.432 维持区间"
+    },
+    {
+      "date": "2026-07-06",
+      "acc_30d": 0.4154,
+      "buy_signals": 65,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.415 维持区间"
+    },
+    {
+      "date": "2026-07-07",
+      "acc_30d": 0.3919,
+      "buy_signals": 74,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.392 维持区间"
+    },
+    {
+      "date": "2026-07-08",
+      "acc_30d": 0.3919,
+      "buy_signals": 74,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.392 维持区间"
+    },
+    {
+      "date": "2026-07-09",
+      "acc_30d": 0.375,
+      "buy_signals": 64,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.375 维持区间"
+    },
+    {
+      "date": "2026-07-10",
+      "acc_30d": 0.3841,
+      "buy_signals": 164,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.384 维持区间"
+    },
+    {
+      "date": "2026-07-13",
+      "acc_30d": 0.3642,
+      "buy_signals": 151,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.364 维持区间"
+    },
+    {
+      "date": "2026-07-14",
+      "acc_30d": 0.3642,
+      "buy_signals": 151,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.364 维持区间"
+    },
+    {
+      "date": "2026-07-15",
+      "acc_30d": 0.3642,
+      "buy_signals": 151,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.364 维持区间"
+    },
+    {
+      "date": "2026-07-16",
+      "acc_30d": 0.3836,
+      "buy_signals": 146,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.384 维持区间"
+    },
+    {
+      "date": "2026-07-17",
+      "acc_30d": 0.3897,
+      "buy_signals": 136,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.390 维持区间"
+    },
+    {
+      "date": "2026-07-20",
+      "acc_30d": 0.4052,
+      "buy_signals": 116,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.405 维持区间"
+    },
+    {
+      "date": "2026-07-21",
+      "acc_30d": 0.4052,
+      "buy_signals": 116,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.405 维持区间"
+    },
+    {
+      "date": "2026-07-22",
+      "acc_30d": 0.4052,
+      "buy_signals": 116,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.405 维持区间"
+    },
+    {
+      "date": "2026-07-23",
+      "acc_30d": 0.3962,
+      "buy_signals": 106,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.396 维持区间"
+    },
+    {
+      "date": "2026-07-24",
+      "acc_30d": 0.3958,
+      "buy_signals": 96,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.396 维持区间"
+    },
+    {
+      "date": "2026-07-27",
+      "acc_30d": 0.4091,
+      "buy_signals": 66,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.409 维持区间"
+    },
+    {
+      "date": "2026-07-28",
+      "acc_30d": 0.4091,
+      "buy_signals": 66,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.409 维持区间"
+    },
+    {
+      "date": "2026-07-29",
+      "acc_30d": 0.4091,
+      "buy_signals": 66,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.409 维持区间"
+    },
+    {
+      "date": "2026-07-30",
+      "acc_30d": 0.3929,
+      "buy_signals": 56,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.393 维持区间"
+    },
+    {
+      "date": "2026-07-31",
+      "acc_30d": 0.3913,
+      "buy_signals": 46,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.391 维持区间"
+    },
+    {
+      "date": "2026-08-03",
+      "acc_30d": 0.4359,
+      "buy_signals": 39,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.436 维持区间"
+    },
+    {
+      "date": "2026-08-04",
+      "acc_30d": 0.4359,
+      "buy_signals": 39,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.436 维持区间"
+    },
+    {
+      "date": "2026-08-05",
+      "acc_30d": 0.4359,
+      "buy_signals": 39,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.436 维持区间"
+    },
+    {
+      "date": "2026-08-06",
+      "acc_30d": 0.5,
+      "buy_signals": 30,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.500 维持区间"
+    },
+    {
+      "date": "2026-08-07",
+      "acc_30d": 0.5,
+      "buy_signals": 30,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: acc_30d 0.500 维持区间"
+    },
+    {
+      "date": "2026-08-10",
+      "acc_30d": 0.875,
+      "buy_signals": 8,
+      "abs_threshold": 0.1859,
+      "change": "0.19 → 0.19: insufficient_samples"
+    },
+    {
+      "date": "2026-08-11",
+      "acc_30d": 0.5556,
+      "buy_signals": 18,
+      "abs_threshold": 0.1659,
+      "change": "0.19 → 0.17: acc_30d 0.556 > 55%, 放宽"
+    },
+    {
+      "date": "2026-08-12",
+      "acc_30d": 0.375,
+      "buy_signals": 32,
+      "abs_threshold": 0.1659,
+      "change": "0.17 → 0.17: acc_30d 0.375 维持区间"
+    },
+    {
+      "date": "2026-08-13",
+      "acc_30d": 0.3721,
+      "buy_signals": 43,
+      "abs_threshold": 0.1659,
+      "change": "0.17 → 0.17: acc_30d 0.372 维持区间"
+    },
+    {
+      "date": "2026-08-14",
+      "acc_30d": 0.3721,
+      "buy_signals": 43,
+      "abs_threshold": 0.1659,
+      "change": "0.17 → 0.17: acc_30d 0.372 维持区间"
+    },
+    {
+      "date": "2026-08-17",
+      "acc_30d": 0.3158,
+      "buy_signals": 38,
+      "abs_threshold": 0.1859,
+      "change": "0.17 → 0.19: acc_30d 0.316 < 35%, 收严"
+    },
+    {
+      "date": "2026-08-18",
+      "acc_30d": 0.3158,
+      "buy_signals": 38,
+      "abs_threshold": 0.2059,
+      "change": "0.19 → 0.21: acc_30d 0.316 < 35%, 收严"
+    },
+    {
+      "date": "2026-08-19",
+      "acc_30d": 0.3158,
+      "buy_signals": 38,
+      "abs_threshold": 0.2259,
+      "change": "0.21 → 0.23: acc_30d 0.316 < 35%, 收严"
+    },
+    {
+      "date": "2026-08-20",
+      "acc_30d": 0.3158,
+      "buy_signals": 38,
+      "abs_threshold": 0.2459,
+      "change": "0.23 → 0.25: acc_30d 0.316 < 35%, 收严"
+    },
+    {
+      "date": "2026-08-21",
+      "acc_30d": 0.3158,
+      "buy_signals": 38,
+      "abs_threshold": 0.2659,
+      "change": "0.25 → 0.27: acc_30d 0.316 < 35%, 收严"
+    },
+    {
+      "date": "2026-08-24",
+      "acc_30d": 0.3,
+      "buy_signals": 50,
+      "abs_threshold": 0.2859,
+      "change": "0.27 → 0.29: acc_30d 0.300 < 35%, 收严"
+    },
+    {
+      "date": "2026-08-25",
+      "acc_30d": 0.3,
+      "buy_signals": 50,
+      "abs_threshold": 0.3059,
+      "change": "0.29 → 0.31: acc_30d 0.300 < 35%, 收严"
+    },
+    {
+      "date": "2026-08-26",
+      "acc_30d": 0.35,
+      "buy_signals": 60,
+      "abs_threshold": 0.3059,
+      "change": "0.31 → 0.31: acc_30d 0.350 维持区间"
+    },
+    {
+      "date": "2026-08-27",
+      "acc_30d": 0.3286,
+      "buy_signals": 70,
+      "abs_threshold": 0.3,
+      "change": "0.31 → 0.30: acc_30d 0.329 < 35%, 收严 (cal_max_cap=0.3000)"
+    },
+    {
+      "date": "2026-08-28",
+      "acc_30d": 0.325,
+      "buy_signals": 80,
+      "abs_threshold": 0.2587,
+      "change": "0.30 → 0.26: acc_30d 0.325 < 35%, 收严 (cal_max_cap=0.2587)"
+    },
+    {
+      "date": "2026-08-31",
+      "acc_30d": 0.2989,
+      "buy_signals": 87,
+      "abs_threshold": 0.2329,
+      "change": "0.26 → 0.23: acc_30d 0.299 < 35%, 收严 (cal_max_cap=0.2329)"
+    },
+    {
+      "date": "2026-09-01",
+      "acc_30d": 0.2989,
+      "buy_signals": 87,
+      "abs_threshold": 0.2456,
+      "change": "0.23 → 0.25: acc_30d 0.299 < 35%, 收严 (cal_max_cap=0.2456)"
+    },
+    {
+      "date": "2026-09-02",
+      "acc_30d": 0.2989,
+      "buy_signals": 87,
+      "abs_threshold": 0.2102,
+      "change": "0.25 → 0.21: acc_30d 0.299 < 35%, 收严 (cal_max_cap=0.2102)"
+    },
+    {
+      "date": "2026-09-03",
+      "acc_30d": 0.2989,
+      "buy_signals": 87,
+      "abs_threshold": 0.2137,
+      "change": "0.21 → 0.21: acc_30d 0.299 < 35%, 收严 (cal_max_cap=0.2137)"
+    },
+    {
+      "date": "2026-09-04",
+      "acc_30d": 0.2989,
+      "buy_signals": 87,
+      "abs_threshold": 0.2104,
+      "change": "0.21 → 0.21: acc_30d 0.299 < 35%, 收严 (cal_max_cap=0.2104)"
     }
   ]
 }

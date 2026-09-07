@@ -108,8 +108,14 @@ def send_predict_results(webhook_url: str, results: list, now: datetime = None,
         reason = r.get("reason", "")
         kline  = r.get("text_kline", "")
         raw_name = r.get("name", "")
-        name     = raw_name.replace("*", "＊").replace("_", "\\_")
-        label    = f"{name}（{r['code']}）" if name and name != r["code"] else r["code"]
+        if not raw_name or raw_name == r["code"]:
+            try:
+                from data.fetcher import _load_name_map
+                raw_name = _load_name_map().get(r["code"], "")
+            except Exception:
+                raw_name = ""
+        name  = raw_name.replace("*", "＊").replace("_", "\\_")
+        label = f"{name}({r['code']})" if name else r["code"]
 
         header = (
             f"{icon} **{label}**　{r['signal']} | "
@@ -184,13 +190,17 @@ def send_review_report(webhook_url: str, report: dict) -> bool:
         rec_watch = [d for d in details if not d.get("is_buy")]
 
         def _safe_label(d: dict) -> str:
-            """返回 '名称（代码）' 标准格式，兼容旧快照缺 name 字段。"""
+            """返回 '名称(代码)' 标准格式，缺 name 时查 name_map。"""
             code = d["code"]
             name = d.get("name", "")
             if not name or name == code:
-                name = code
-            safe = name.replace("*", "＊").replace("_", "\\_")
-            return f"{safe}（{code}）"
+                try:
+                    from data.fetcher import _load_name_map
+                    name = _load_name_map().get(code, "")
+                except Exception:
+                    name = ""
+            safe = (name or "").replace("*", "＊").replace("_", "\\_")
+            return f"{safe}({code})" if safe else code
 
         # 买入信号区
         if rec_buy:

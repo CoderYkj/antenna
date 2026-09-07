@@ -25,8 +25,6 @@ def main():
     with open("config.yaml", encoding="utf-8") as f:
         config = yaml.safe_load(f)
 
-    webhook_url = config.get("feishu", {}).get("webhook_url", "")
-
     print(f"[task_train] 开始训练 ...")
     t0 = time.time()
 
@@ -39,13 +37,11 @@ def main():
     elapsed = time.time() - t0
     print(f"[task_train] 训练完成，耗时 {elapsed:.0f}s")
 
-    # 推送飞书通知
-    from notify.feishu import send_train_done
-    ok = send_train_done(webhook_url, elapsed_seconds=elapsed)
-    if ok:
-        print("[task_train] 飞书通知已发送。")
-    elif webhook_url:
-        print("[task_train] 飞书通知发送失败。")
+    # 推送通知
+    from notify import send_train_done
+    results = send_train_done(elapsed_seconds=elapsed)
+    ok = any(results.values()) if results else False
+    print(f"[task_train] 推送{'成功' if ok else '失败或未配置'}: {results}")
 
 
 if __name__ == "__main__":

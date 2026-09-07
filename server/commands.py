@@ -18,6 +18,7 @@ PUSH_WORDS    = {"发送", "推送", "广播", "push", "broadcast"}
 NEWS_WORDS    = {"新闻", "消息", "资讯", "news", "n"}
 TREND_WORDS   = {"趋势", "trend", "k线", "kline"}
 LEARN_WORDS   = {"学习", "自学习", "learn", "l"}
+TRAIN_WORDS   = {"训练", "重训", "train", "retrain"}
 HELP_WORDS    = {"帮助", "help", "?", "？"}
 
 
@@ -69,6 +70,7 @@ def _help_card() -> dict:
         _row("历史 YYYY-MM",   "Walk-Forward 月度历史回测",            "历史 2026-01"),
         _row("策略",               "查看当前选股策略依据与评判标准",       ""),
         _row("学习 （参数）",      "手动触发学习管线,完成后推送结果",     "学习 / 学习 dry-run / 学习 2026-04-29"),
+        _row("训练 （加权）",       "重新训练 LightGBM 模型，约 10-20 分钟", "训练 / 训练 加权"),
         {"tag": "hr"},
         _row("发送 <指令>", "执行指令并广播到所有配置会话", "发送 推荐"),
         {"tag": "hr"},
@@ -208,6 +210,11 @@ def handle_command(text: str, chat_id: str = ""):
         arg = parts[1] if len(parts) >= 2 else None
         from server.predict_cmd import cmd_learn
         return cmd_learn(arg, chat_id)
+
+    if cmd in TRAIN_WORDS:
+        arg = parts[1] if len(parts) >= 2 else None
+        from server.predict_cmd import cmd_train
+        return cmd_train(arg, chat_id)
 
     if cmd in TACTIC_WORDS:
         # 战法 <策略名> [N]，如：战法 价值 5

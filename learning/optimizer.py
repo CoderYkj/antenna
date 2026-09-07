@@ -76,11 +76,10 @@ def evaluate_day(date_str: str) -> dict | None:
     """
     回测某日预测结果。
 
-    只统计推荐股（非自选股）中信号为「买入」的精准率（Precision）：
-      - 推荐股买入 → 实际涨幅 >= rise_target_pct 算命中（True Positive）
-      - 推荐股买入 → 实际涨幅 < rise_target_pct 算未命中（False Positive）
-      - 推荐股观望/回避 → 不计入精准率（规避观望 bias）
-      - 自选股 → 单独显示命中/未命中，不计入策略优化的精准率分母
+    统计推荐股（非自选股）整体准确率（Accuracy）：
+      - 推荐股买入 → 实际涨幅 >= rise_target_pct 算命中
+      - 推荐股观望/回避 → 实际涨幅 < rise_target_pct 算命中（正确回避）
+      - 自选股 → 单独显示命中/未命中，不计入策略优化计数器
 
     信号来源：优先读快照中存储的 signal 字段；
     缺失时回退到 rise_prob >= threshold 判断（兼容旧数据）。
@@ -91,8 +90,12 @@ def evaluate_day(date_str: str) -> dict | None:
     if not preds or not outcomes:
         return None
 
+    # 自选股只取 predict scene（authoritative），过滤掉 scan scene 的重复条目
+    wl_predict_codes = {p["code"] for p in preds if p.get("watchlist") and p.get("scene", "scan") == "predict"}
+    preds = [p for p in preds if not (p.get("watchlist") and p.get("scene", "scan") != "predict" and p["code"] in wl_predict_codes)]
+
     threshold    = strategy.get("buy_threshold", 0.60)  # 仅旧数据回退用
-    rise_target  = strategy["rise_target_pct"]
+    rise_target  = strategy.get("rise_target_pct", RISE_THRESHOLD)
     hits, total  = 0, 0
     details      = []
 
@@ -115,16 +118,18 @@ def evaluate_day(date_str: str) -> dict | None:
             # 停牌或缺数据，跳过不计入精准率
             continue
 
-        # 推荐股：买入信号才计入策略优化精准率，观望/回避 hit=None
-        # 自选股：始终计算 hit 供显示，但不计入策略优化计数器
+        # 推荐股：买入命中=涨，观望/回避命中=未涨（正确回避），均计入准确率
+        # 自选股：按信号计算命中，供显示用，不计入策略优化计数器
         if is_watchlist:
-            hit = (actual_pct >= rise_target)
+            hit = (actual_pct >= rise_target) if is_buy else (actual_pct < rise_target)
         elif is_buy:
             hit = (actual_pct >= rise_target)
             hits  += int(hit)
             total += 1
         else:
-            hit = None  # 推荐股观望/回避不参与精准率统计
+            hit = (actual_pct < rise_target)  # 观望/回避正确回避也算命中
+            hits  += int(hit)
+            total += 1
 
         details.append({
             "code":        code,

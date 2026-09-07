@@ -115,6 +115,11 @@ def _build_patches(codes, alt_patch):
         patch("features.analyser.fetch_cls_news_for", return_value=([], [])),
         patch("features.analyser.analyse",             return_value=""),
         patch("features.analyser.build_bull_reasons",  return_value=([], [])),
+        # 让 cmd_scan_bot 的后台线程同步执行，避免断言与线程的竞态条件
+        patch("threading.Thread",
+              side_effect=lambda target, daemon=False: type(
+                  "_SyncThread", (), {"start": staticmethod(target)}
+              )()),
         patch("server.predict_cmd._predict_date",      return_value=("2026-05-21", True)),
         patch("data.alt_fetcher.fetch_alt_features",   alt_patch),
     ]

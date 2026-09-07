@@ -1,86 +1,110 @@
 {
   "version": 1,
-  "updated_at": "2026-05-11T17:16:52",
+  "updated_at": "2026-09-04T15:33:06",
   "entries": {
-    "600967|range": {
-      "until": "2026-05-29",
-      "streak_count": 4,
-      "last_miss": "2026-04-24",
-      "added_at": "2026-04-29",
-      "reason": "range 状态下连续 4 次 buy+miss/weak"
-    },
-    "603105|range": {
-      "until": "2026-05-29",
+    "001260|bear": {
+      "until": "2026-10-03",
       "streak_count": 3,
-      "last_miss": "2026-04-24",
-      "added_at": "2026-04-29",
-      "reason": "range 状态下连续 3 次 buy+miss/weak"
+      "last_miss": "2026-08-27",
+      "added_at": "2026-09-03",
+      "reason": "bear 状态下连续 3 次 buy+miss/weak"
     },
-    "300471|range": {
-      "until": "2026-05-29",
-      "streak_count": 3,
-      "last_miss": "2026-04-23",
-      "added_at": "2026-04-29",
-      "reason": "range 状态下连续 3 次 buy+miss/weak"
+    "603097|bear": {
+      "until": "2026-10-03",
+      "streak_count": 2,
+      "last_miss": "2026-08-27",
+      "added_at": "2026-09-03",
+      "reason": "bear 状态下连续 2 次 buy+miss/weak"
     },
-    "300581|range": {
-      "until": "2026-05-29",
-      "streak_count": 6,
-      "last_miss": "2026-04-23",
-      "added_at": "2026-04-29",
-      "reason": "range 状态下连续 6 次 buy+miss/weak"
-    },
-    "600775|range": {
-      "until": "2026-05-29",
-      "streak_count": 3,
-      "last_miss": "2026-04-23",
-      "added_at": "2026-04-29",
-      "reason": "range 状态下连续 3 次 buy+miss/weak"
-    },
-    "600621|range": {
-      "until": "2026-05-29",
-      "streak_count": 4,
-      "last_miss": "2026-04-22",
-      "added_at": "2026-04-29",
-      "reason": "range 状态下连续 4 次 buy+miss/weak"
-    },
-    "002365|range": {
-      "until": "2026-05-27",
-      "streak_count": 4,
-      "last_miss": "2026-04-21",
-      "added_at": "2026-04-27",
-      "reason": "range 状态下连续 4 次 buy+miss/weak"
-    },
-    "000001|range": {
-      "until": "2026-05-27",
-      "streak_count": 7,
-      "last_miss": "2026-04-20",
-      "added_at": "2026-04-27",
-      "reason": "range 状态下连续 7 次 buy+miss/weak"
-    },
-    "600737|range": {
-      "until": "2026-05-27",
-      "streak_count": 3,
-      "last_miss": "2026-04-20",
-      "added_at": "2026-04-27",
-      "reason": "range 状态下连续 3 次 buy+miss/weak"
-    },
-    "301367|range": {
-      "until": "2026-06-10",
-      "streak_count": 4,
-      "last_miss": "2026-05-08",
-      "added_at": "2026-05-11",
-      "reason": "range 状态下连续 4 次 buy+miss/weak"
-    },
-    "688708|range": {
-      "until": "2026-06-10",
-      "streak_count": 3,
-      "last_miss": "2026-05-08",
-      "added_at": "2026-05-11",
-      "reason": "range 状态下连续 3 次 buy+miss/weak"
+    "605555|bear": {
+      "until": "2026-10-03",
+      "streak_count": 2,
+      "last_miss": "2026-08-27",
+      "added_at": "2026-09-03",
+      "reason": "bear 状态下连续 2 次 buy+miss/weak"
     }
   },
   "history": [
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600621",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "002365",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "000001",
+      "state": "range",
+      "streak": 7,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600737",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600967",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "603105",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "300471",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "300581",
+      "state": "range",
+      "streak": 6,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600775",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600621",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-29"
+    },
     {
       "date": "2026-04-27",
       "action": "add",
@@ -202,20 +226,1379 @@
       "until": "2026-05-29"
     },
     {
-      "date": "2026-05-11",
+      "date": "2026-04-27",
       "action": "add",
-      "code": "301367",
+      "code": "600967",
       "state": "range",
       "streak": 4,
-      "until": "2026-06-10"
+      "until": "2026-05-27"
     },
     {
-      "date": "2026-05-11",
+      "date": "2026-04-27",
       "action": "add",
-      "code": "688708",
+      "code": "603105",
       "state": "range",
       "streak": 3,
-      "until": "2026-06-10"
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "300471",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "300581",
+      "state": "range",
+      "streak": 6,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600775",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600621",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "002365",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "000001",
+      "state": "range",
+      "streak": 7,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600737",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600967",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "603105",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "300471",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "300581",
+      "state": "range",
+      "streak": 6,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600775",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600621",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600967",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "603105",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "300471",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "300581",
+      "state": "range",
+      "streak": 6,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600775",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600621",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "002365",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "000001",
+      "state": "range",
+      "streak": 7,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600737",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600967",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "603105",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "300471",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "300581",
+      "state": "range",
+      "streak": 6,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600775",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600621",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600967",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "603105",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "300471",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "300581",
+      "state": "range",
+      "streak": 6,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600775",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600621",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "002365",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "000001",
+      "state": "range",
+      "streak": 7,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600737",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600967",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "603105",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "300471",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "300581",
+      "state": "range",
+      "streak": 6,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600775",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600621",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600967",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "603105",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "300471",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "300581",
+      "state": "range",
+      "streak": 6,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600775",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600621",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "002365",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "000001",
+      "state": "range",
+      "streak": 7,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600737",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600967",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "603105",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "300471",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "300581",
+      "state": "range",
+      "streak": 6,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600775",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600621",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600967",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "603105",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "300471",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "300581",
+      "state": "range",
+      "streak": 6,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600775",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600621",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "002365",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "000001",
+      "state": "range",
+      "streak": 7,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600737",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600967",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "603105",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "300471",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "300581",
+      "state": "range",
+      "streak": 6,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600775",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600621",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-05-28",
+      "action": "expire",
+      "code": "002365",
+      "state": "range",
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-05-28",
+      "action": "expire",
+      "code": "000001",
+      "state": "range",
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-05-28",
+      "action": "expire",
+      "code": "600737",
+      "state": "range",
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-05-28",
+      "action": "add",
+      "code": "601218",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-06-27"
+    },
+    {
+      "date": "2026-05-28",
+      "action": "add",
+      "code": "601218",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-06-27"
+    },
+    {
+      "date": "2026-05-29",
+      "action": "add",
+      "code": "300573",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-06-28"
+    },
+    {
+      "date": "2026-05-29",
+      "action": "add",
+      "code": "601218",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-06-28"
+    },
+    {
+      "date": "2026-05-29",
+      "action": "add",
+      "code": "300573",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-06-28"
+    },
+    {
+      "date": "2026-05-29",
+      "action": "add",
+      "code": "601218",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-06-28"
+    },
+    {
+      "date": "2026-06-01",
+      "action": "expire",
+      "code": "600967",
+      "state": "range",
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-06-01",
+      "action": "expire",
+      "code": "603105",
+      "state": "range",
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-06-01",
+      "action": "expire",
+      "code": "300471",
+      "state": "range",
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-06-01",
+      "action": "expire",
+      "code": "300581",
+      "state": "range",
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-06-01",
+      "action": "expire",
+      "code": "600775",
+      "state": "range",
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-06-01",
+      "action": "expire",
+      "code": "600621",
+      "state": "range",
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-06-01",
+      "action": "add",
+      "code": "300573",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-07-01"
+    },
+    {
+      "date": "2026-06-01",
+      "action": "add",
+      "code": "601218",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-07-01"
+    },
+    {
+      "date": "2026-06-01",
+      "action": "add",
+      "code": "300573",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-07-01"
+    },
+    {
+      "date": "2026-06-01",
+      "action": "add",
+      "code": "601218",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-07-01"
+    },
+    {
+      "date": "2026-06-01",
+      "action": "add",
+      "code": "300573",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-07-01"
+    },
+    {
+      "date": "2026-06-01",
+      "action": "add",
+      "code": "601218",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-07-01"
+    },
+    {
+      "date": "2026-06-01",
+      "action": "add",
+      "code": "300573",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-07-01"
+    },
+    {
+      "date": "2026-06-01",
+      "action": "add",
+      "code": "601218",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-07-01"
+    },
+    {
+      "date": "2026-06-02",
+      "action": "add",
+      "code": "300573",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-07-02"
+    },
+    {
+      "date": "2026-06-02",
+      "action": "add",
+      "code": "601218",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-07-02"
+    },
+    {
+      "date": "2026-06-02",
+      "action": "add",
+      "code": "300573",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-07-02"
+    },
+    {
+      "date": "2026-06-02",
+      "action": "add",
+      "code": "601218",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-07-02"
+    },
+    {
+      "date": "2026-06-03",
+      "action": "add",
+      "code": "300573",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-07-03"
+    },
+    {
+      "date": "2026-06-03",
+      "action": "add",
+      "code": "601218",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-07-03"
+    },
+    {
+      "date": "2026-06-03",
+      "action": "add",
+      "code": "300573",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-07-03"
+    },
+    {
+      "date": "2026-06-03",
+      "action": "add",
+      "code": "601218",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-07-03"
+    },
+    {
+      "date": "2026-06-04",
+      "action": "add",
+      "code": "300573",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-07-04"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600967",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "603105",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "300471",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "300581",
+      "state": "range",
+      "streak": 6,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600775",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600621",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "002365",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "000001",
+      "state": "range",
+      "streak": 8,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600737",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600967",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "603105",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "300471",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "300581",
+      "state": "range",
+      "streak": 6,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600775",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600621",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600967",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "603105",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "300471",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "300581",
+      "state": "range",
+      "streak": 6,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600775",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600621",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "002365",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "000001",
+      "state": "range",
+      "streak": 8,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-27",
+      "action": "add",
+      "code": "600737",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600967",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "603105",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "300471",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "300581",
+      "state": "range",
+      "streak": 6,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600775",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-04-29",
+      "action": "add",
+      "code": "600621",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-06-08",
+      "action": "expire",
+      "code": "600967",
+      "state": "range",
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-06-08",
+      "action": "expire",
+      "code": "603105",
+      "state": "range",
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-06-08",
+      "action": "expire",
+      "code": "300471",
+      "state": "range",
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-06-08",
+      "action": "expire",
+      "code": "300581",
+      "state": "range",
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-06-08",
+      "action": "expire",
+      "code": "600775",
+      "state": "range",
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-06-08",
+      "action": "expire",
+      "code": "600621",
+      "state": "range",
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-06-08",
+      "action": "expire",
+      "code": "002365",
+      "state": "range",
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-06-08",
+      "action": "expire",
+      "code": "000001",
+      "state": "range",
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-06-08",
+      "action": "expire",
+      "code": "600737",
+      "state": "range",
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-06-08",
+      "action": "add",
+      "code": "300717",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-07-08"
+    },
+    {
+      "date": "2026-06-08",
+      "action": "add",
+      "code": "688667",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-07-08"
+    },
+    {
+      "date": "2026-06-09",
+      "action": "add",
+      "code": "300717",
+      "state": "range",
+      "streak": 4,
+      "until": "2026-07-09"
+    },
+    {
+      "date": "2026-06-09",
+      "action": "add",
+      "code": "688667",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-07-09"
+    },
+    {
+      "date": "2026-06-10",
+      "action": "add",
+      "code": "600265",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-07-10"
+    },
+    {
+      "date": "2026-06-10",
+      "action": "add",
+      "code": "600265",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-07-10"
+    },
+    {
+      "date": "2026-06-15",
+      "action": "expire",
+      "code": "301367",
+      "state": "range",
+      "until": "2026-06-14"
+    },
+    {
+      "date": "2026-06-15",
+      "action": "expire",
+      "code": "688708",
+      "state": "range",
+      "until": "2026-06-14"
+    },
+    {
+      "date": "2026-07-06",
+      "action": "expire",
+      "code": "601218",
+      "state": "range",
+      "until": "2026-07-03"
+    },
+    {
+      "date": "2026-07-06",
+      "action": "expire",
+      "code": "300573",
+      "state": "range",
+      "until": "2026-07-04"
+    },
+    {
+      "date": "2026-07-10",
+      "action": "expire",
+      "code": "300717",
+      "state": "range",
+      "until": "2026-07-09"
+    },
+    {
+      "date": "2026-07-10",
+      "action": "expire",
+      "code": "688667",
+      "state": "range",
+      "until": "2026-07-09"
+    },
+    {
+      "date": "2026-07-13",
+      "action": "expire",
+      "code": "600265",
+      "state": "range",
+      "until": "2026-07-10"
+    },
+    {
+      "date": "2026-08-27",
+      "action": "add",
+      "code": "001260",
+      "state": "bear",
+      "streak": 2,
+      "until": "2026-09-26"
+    },
+    {
+      "date": "2026-08-28",
+      "action": "add",
+      "code": "001260",
+      "state": "bear",
+      "streak": 3,
+      "until": "2026-09-27"
+    },
+    {
+      "date": "2026-08-28",
+      "action": "add",
+      "code": "603097",
+      "state": "bear",
+      "streak": 2,
+      "until": "2026-09-27"
+    },
+    {
+      "date": "2026-08-28",
+      "action": "add",
+      "code": "605555",
+      "state": "bear",
+      "streak": 2,
+      "until": "2026-09-27"
+    },
+    {
+      "date": "2026-08-31",
+      "action": "add",
+      "code": "001260",
+      "state": "bear",
+      "streak": 3,
+      "until": "2026-09-30"
+    },
+    {
+      "date": "2026-08-31",
+      "action": "add",
+      "code": "603097",
+      "state": "bear",
+      "streak": 2,
+      "until": "2026-09-30"
+    },
+    {
+      "date": "2026-08-31",
+      "action": "add",
+      "code": "605555",
+      "state": "bear",
+      "streak": 2,
+      "until": "2026-09-30"
+    },
+    {
+      "date": "2026-09-01",
+      "action": "add",
+      "code": "001260",
+      "state": "bear",
+      "streak": 3,
+      "until": "2026-10-01"
+    },
+    {
+      "date": "2026-09-01",
+      "action": "add",
+      "code": "603097",
+      "state": "bear",
+      "streak": 2,
+      "until": "2026-10-01"
+    },
+    {
+      "date": "2026-09-01",
+      "action": "add",
+      "code": "605555",
+      "state": "bear",
+      "streak": 2,
+      "until": "2026-10-01"
+    },
+    {
+      "date": "2026-09-02",
+      "action": "add",
+      "code": "001260",
+      "state": "bear",
+      "streak": 3,
+      "until": "2026-10-02"
+    },
+    {
+      "date": "2026-09-02",
+      "action": "add",
+      "code": "603097",
+      "state": "bear",
+      "streak": 2,
+      "until": "2026-10-02"
+    },
+    {
+      "date": "2026-09-02",
+      "action": "add",
+      "code": "605555",
+      "state": "bear",
+      "streak": 2,
+      "until": "2026-10-02"
+    },
+    {
+      "date": "2026-09-03",
+      "action": "add",
+      "code": "001260",
+      "state": "bear",
+      "streak": 3,
+      "until": "2026-10-03"
+    },
+    {
+      "date": "2026-09-03",
+      "action": "add",
+      "code": "603097",
+      "state": "bear",
+      "streak": 2,
+      "until": "2026-10-03"
+    },
+    {
+      "date": "2026-09-03",
+      "action": "add",
+      "code": "605555",
+      "state": "bear",
+      "streak": 2,
+      "until": "2026-10-03"
     }
   ]
 }

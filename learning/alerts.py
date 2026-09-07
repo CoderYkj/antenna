@@ -21,7 +21,7 @@ ALERTS_FILE = Path("learning/alerts.jsonl")
 
 
 def _get_webhook() -> str:
-    """读 config.yaml 拿飞书 webhook。"""
+    """读 config.yaml 拿飞书 webhook（兼容旧逻辑，dispatcher 会同时处理多通道）。"""
     try:
         import yaml
         with open("config.yaml", encoding="utf-8") as f:
@@ -31,11 +31,12 @@ def _get_webhook() -> str:
         return ""
 
 
-def _push_feishu(webhook: str, msg: str) -> bool:
-    """发送纯文本告警到飞书 webhook。失败不抛。"""
+def _push_alert(msg: str) -> bool:
+    """通过 dispatcher 发送纯文本告警到所有启用通道。失败不抛。"""
     try:
-        from notify.feishu import send_text
-        return send_text(webhook, msg)
+        from notify.dispatcher import send_text
+        results = send_text(msg)
+        return any(results.values()) if results else False
     except Exception:
         return False
 
@@ -63,6 +64,4 @@ def send_alert(module: str, message: str, severity: str = "error", traceback: bo
     full_msg = f"⚠️ [{module}] {message}{tb_str}"
     record_alert(module, message + tb_str, severity)
 
-    webhook = _get_webhook()
-    if webhook:
-        _push_feishu(webhook, full_msg)
+    _push_alert(full_msg)
