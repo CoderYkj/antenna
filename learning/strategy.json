@@ -245,10 +245,10 @@
       "guardrail_reasons": []
     }
   ],
-  "last_thresh_buy": 0.3135,
-  "last_thresh_watch": 0.3135,
+  "last_thresh_buy": 0.6,
+  "last_thresh_watch": 0.6,
   "last_scan_date": "2026-09-07",
-  "last_scan_total": 5191,
+  "last_scan_total": 5207,
   "last_guardrail_trace": {
     "state": "range",
     "min_pct": 0.08,

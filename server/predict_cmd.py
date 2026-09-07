@@ -11,6 +11,31 @@ from datetime import datetime, time as dtime, timedelta
 log = logging.getLogger(__name__)
 
 
+def _log_critical_error(tag: str, exc: Exception) -> None:
+    """记录后台线程异常:既写常规日志(log.exception),也追加一条不受
+    日志轮转/重启影响的持久化记录到 logs/critical_errors.jsonl,
+    方便事后排查(含完整 traceback,而不只是 str(e) 摘要)。
+    """
+    import json as _json
+    import os as _os
+    import time as _time
+    import traceback as _traceback
+
+    log.exception(tag)
+    try:
+        _os.makedirs("logs", exist_ok=True)
+        record = {
+            "ts": _time.strftime("%Y-%m-%d %H:%M:%S"),
+            "tag": tag,
+            "error": repr(exc),
+            "traceback": _traceback.format_exc(),
+        }
+        with open("logs/critical_errors.jsonl", "a", encoding="utf-8") as _f:
+            _f.write(_json.dumps(record, ensure_ascii=False) + "\n")
+    except Exception:
+        pass  # 持久化失败不应影响原有的失败通知流程
+
+
 def _today() -> str:
     return datetime.now().strftime("%Y-%m-%d")
 
@@ -2177,7 +2202,7 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
         try:
             result = _cmd_scan_bot_impl(top_n)
         except Exception as e:
-            log.exception("[推荐] 后台扫描失败")
+            _log_critical_error("[推荐] 后台扫描失败", e)
             result = {"msg_type": "text", "content": json.dumps(
                 {"text": f"推荐扫描失败：{e}"}, ensure_ascii=False)}
         from server.feishu_push import push as _push
@@ -3066,7 +3091,7 @@ def cmd_tactic(strategy_key: str, top_n: int = 5) -> dict:
         try:
             result = _tactic_run(strategy, top_n, all_codes, title, color, criteria)
         except Exception as e:
-            log.exception("[战法] 后台执行失败")
+            _log_critical_error("[战法] 后台执行失败", e)
             result = f"【{title}】执行失败：{e}"
         from server.feishu_push import push
         push(result)
