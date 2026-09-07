@@ -55,7 +55,7 @@ def test_predict_signal_buy_when_high_prob(monkeypatch):
     from features.technical import FEATURE_COLS
     df = _make_feature_df()
     monkeypatch.setattr("models.predictor._apply_calibration",
-                        lambda p: (float(p), 0.0))  # 恒等映射 + abs_threshold=0
+                        lambda p, **_: (float(p), 0.0))  # 恒等映射 + abs_threshold=0
     with patch("models.predictor.load_latest_model", return_value=_MockModel(0.75)):
         result = predict(df, FEATURE_COLS)
     assert result["signal"] == "买入"
@@ -68,7 +68,7 @@ def test_predict_signal_avoid_when_low_prob(monkeypatch):
     from features.technical import FEATURE_COLS
     df = _make_feature_df()
     monkeypatch.setattr("models.predictor._apply_calibration",
-                        lambda p: (float(p), 0.0))
+                        lambda p, **_: (float(p), 0.0))
     with patch("models.predictor.load_latest_model", return_value=_MockModel(0.25)):
         result = predict(df, FEATURE_COLS)
     assert result["signal"] == "回避"

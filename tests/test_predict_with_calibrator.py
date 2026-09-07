@@ -80,6 +80,23 @@ class TestPredictFields:
 # ── calibration 异常不阻断 ────────────────────────────────
 
 class TestCalibrationFailSafe:
+    def test_current_model_sha_is_forwarded_to_calibrator(self, monkeypatch):
+        from models.predictor import _apply_calibration
+        from learning import model_learner
+
+        seen = {}
+
+        def fake_load(state, current_model_sha=None):
+            seen["state"] = state
+            seen["model_sha"] = current_model_sha
+            return _ScaleCalibrator()
+
+        monkeypatch.setattr(model_learner, "load_calibrator", fake_load)
+        prob_cal, _ = _apply_calibration(0.30, model_sha="current-sha")
+
+        assert prob_cal == 0.60
+        assert seen["model_sha"] == "current-sha"
+
     def test_calibrator_load_exception_returns_raw(self, monkeypatch):
         from models.predictor import _apply_calibration
 

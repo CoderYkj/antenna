@@ -16,7 +16,13 @@ signal 分配规则(spec §3.1,双门槛):
 """
 from __future__ import annotations
 
+import hashlib
+from pathlib import Path
+
 from models.trainer import load_latest_model
+
+
+_model_sha_cache: dict[str, tuple[int, int, str]] = {}
 
 # ── 模型缓存 ────────────────────────────────────────────────
 _model_cache: dict = {}
@@ -29,9 +35,37 @@ def load_model(model_dir: str = "models/saved"):
     return _model_cache[model_dir]
 
 
+def _latest_model_sha(model_dir: str) -> str | None:
+    """Return the content fingerprint for the model used by this predictor.
+
+    Calibration is only valid for the exact model that produced its samples.
+    Cache the digest by file size/mtime because a full scan calls ``predict``
+    once per stock.
+    """
+    try:
+        model_paths = sorted(Path(model_dir).glob("model_*.pkl"))
+        if not model_paths:
+            return None
+        path = model_paths[-1]
+        stat = path.stat()
+        cache_key = str(path.resolve())
+        cached = _model_sha_cache.get(cache_key)
+        signature = (stat.st_size, stat.st_mtime_ns)
+        if cached and cached[:2] == signature:
+            return cached[2]
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()[:12]
+        _model_sha_cache[cache_key] = (*signature, digest)
+        return digest
+    except OSError:
+        return None
+
+
 # ── P1 校准器接入(惰性加载避免循环 import) ────────────────
 
-def _apply_calibration(prob_raw: float) -> tuple[float, float]:
+def _apply_calibration(
+    prob_raw: float,
+    model_sha: str | None = None,
+) -> tuple[float, float]:
     """(rise_prob_raw) → (rise_prob_cal, abs_threshold_snapshot)。
 
     任何异常均回退到恒等映射,确保推荐路径不阻断。
@@ -39,7 +73,10 @@ def _apply_calibration(prob_raw: float) -> tuple[float, float]:
     try:
         from learning import model_learner, market_state
         state = market_state.load_current_state().get("current", "range")
-        cal = model_learner.load_calibrator(state)
+        cal = model_learner.load_calibrator(
+            state,
+            current_model_sha=model_sha,
+        )
         transformed = cal.transform([prob_raw])
         prob_cal = float(transformed[0]) if transformed else float(prob_raw)
         abs_thres = model_learner.load_abs_threshold()
@@ -90,7 +127,10 @@ def predict(
         raise ValueError("No valid rows after dropping NaN — need more history data.")
 
     prob_raw = float(model.predict(valid.iloc[[-1]])[0])
-    prob_cal, abs_threshold = _apply_calibration(prob_raw)
+    prob_cal, abs_threshold = _apply_calibration(
+        prob_raw,
+        model_sha=_latest_model_sha(model_dir),
+    )
 
     # 近 60 行分布:用于 self_rank_pct 与分位切
     tail = valid.tail(60)
