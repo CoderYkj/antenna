@@ -5,6 +5,7 @@ __pycache__/
 # Project runtime artifacts
 data/cache/*
 !data/cache/alt/
+data/fin_cache.json
 models/saved/
 reports/output/
 
@@ -36,5 +37,9 @@ learning/history/
 learning/alerts.jsonl
 learning/replay/
 learning/*.json.bak
+learning/ai_reason_cache.json
 data/cache/alt/*
 !data/cache/alt/.gitkeep
+
+# Local code-intelligence tool cache (machine-local, not for committing)
+.codegraph/
