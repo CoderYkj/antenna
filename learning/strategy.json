@@ -1,733 +1,267 @@
 {
-  "buy_top_pct": 0.25,
-  "last_thresh_buy": 0.2575,
-  "last_thresh_watch": 0.2575,
-  "last_scan_date": "2026-07-31",
-  "last_scan_total": 5193,
-  "accuracy_7d": 0.6429,
-  "accuracy_30d": 0.5875,
+  "buy_top_pct": 0.15,
+  "buy_threshold": 0.6,
+  "rise_target_pct": 1.0,
+  "target_accuracy": 0.55,
+  "accuracy_7d": 0.4333,
+  "accuracy_30d": 0.4672,
+  "last_updated": "2026-08-31T17:36:52.671020",
   "floor_days": 0,
-  "last_updated": "2026-09-04T15:32:03.370409",
+  "positioning": {
+    "bull": 1.0,
+    "range": 0.6,
+    "bear": 0.3
+  },
+  "risk_guardrails": {
+    "by_state_bounds": {
+      "bull": {
+        "min": 0.08,
+        "max": 0.25
+      },
+      "range": {
+        "min": 0.08,
+        "max": 0.2
+      },
+      "bear": {
+        "min": 0.06,
+        "max": 0.14
+      }
+    },
+    "low_accuracy_cap": {
+      "acc_30d_threshold": 0.4,
+      "max_buy_top_pct": 0.12
+    }
+  },
   "history": [
     {
-      "date": "2026-04-29",
-      "acc_7d": 0.4661,
-      "acc_30d": 0.6068,
-      "samples_7": 118,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 46.6% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-04-30",
-      "acc_7d": 0.4661,
-      "acc_30d": 0.6027,
-      "samples_7": 118,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 46.6% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-05-06",
-      "acc_7d": 0.4661,
-      "acc_30d": 0.6037,
-      "samples_7": 118,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 46.6% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-05-07",
-      "acc_7d": 0.4661,
-      "acc_30d": 0.6144,
-      "samples_7": 118,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 46.6% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-05-08",
-      "acc_7d": 0.4661,
-      "acc_30d": 0.6205,
-      "samples_7": 118,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 46.6% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-05-11",
-      "acc_7d": 0.4661,
-      "acc_30d": 0.6229,
-      "samples_7": 118,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 46.6% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-05-12",
-      "acc_7d": 0.4661,
-      "acc_30d": 0.6052,
-      "samples_7": 118,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 46.6% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-05-13",
-      "acc_7d": 0.4661,
-      "acc_30d": 0.6106,
-      "samples_7": 118,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 46.6% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-05-14",
-      "acc_7d": 0.4661,
-      "acc_30d": 0.6,
-      "samples_7": 118,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 46.6% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-05-15",
-      "acc_7d": 0.4661,
-      "acc_30d": 0.5786,
-      "samples_7": 118,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 46.6% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-05-18",
-      "acc_7d": 0.4661,
-      "acc_30d": 0.5687,
-      "samples_7": 118,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 46.6% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-05-19",
-      "acc_7d": 0.4661,
-      "acc_30d": 0.5678,
-      "samples_7": 118,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 46.6% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-05-20",
-      "acc_7d": 0.4661,
-      "acc_30d": 0.5553,
-      "samples_7": 118,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 46.6% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-05-21",
-      "acc_7d": 0.4661,
-      "acc_30d": 0.5364,
-      "samples_7": 118,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 46.6% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-05-22",
-      "acc_7d": 0.4661,
-      "acc_30d": 0.5439,
-      "samples_7": 118,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 46.6% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-05-25",
-      "acc_7d": 0.4661,
-      "acc_30d": 0.5269,
-      "samples_7": 118,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 46.6% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-05-26",
-      "acc_7d": 0.4661,
-      "acc_30d": 0.522,
-      "samples_7": 118,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 46.6% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-05-27",
-      "acc_7d": 0.4661,
-      "acc_30d": 0.52,
-      "samples_7": 118,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 46.6% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-05-28",
-      "acc_7d": 0.4661,
-      "acc_30d": 0.4974,
-      "samples_7": 118,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 46.6% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-05-29",
-      "acc_7d": 0.4661,
-      "acc_30d": 0.5027,
-      "samples_7": 118,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 46.6% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-06-01",
-      "acc_7d": 0.4074,
-      "acc_30d": 0.4861,
-      "samples_7": 108,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 40.7% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-06-19",
-      "acc_7d": 0.4767,
-      "acc_30d": 0.4459,
-      "samples_7": 86,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 47.7% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-07-01",
-      "acc_7d": 0.5068,
-      "acc_30d": 0.4756,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 50.7% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-07-02",
-      "acc_7d": 0.5735,
-      "acc_30d": 0.5,
-      "samples_7": 68,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 57.4% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-07-03",
-      "acc_7d": 0.6087,
-      "acc_30d": 0.503,
-      "samples_7": 69,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 60.9% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-07-06",
-      "acc_7d": 0.5652,
-      "acc_30d": 0.4954,
-      "samples_7": 69,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 56.5% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-07-07",
-      "acc_7d": 0.6176,
-      "acc_30d": 0.5092,
-      "samples_7": 68,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 61.8% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-07-08",
-      "acc_7d": 0.6324,
-      "acc_30d": 0.5215,
-      "samples_7": 68,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 63.2% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-07-09",
-      "acc_7d": 0.589,
-      "acc_30d": 0.5166,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 58.9% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-06-02",
-      "acc_7d": 0.589,
-      "acc_30d": 0.5166,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 58.9% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-06-03",
-      "acc_7d": 0.589,
-      "acc_30d": 0.4985,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 58.9% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-06-04",
-      "acc_7d": 0.589,
-      "acc_30d": 0.4924,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 58.9% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-06-05",
-      "acc_7d": 0.589,
-      "acc_30d": 0.4955,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 58.9% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-06-08",
-      "acc_7d": 0.589,
-      "acc_30d": 0.4924,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 58.9% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-06-09",
-      "acc_7d": 0.589,
-      "acc_30d": 0.4894,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 58.9% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-06-10",
-      "acc_7d": 0.589,
-      "acc_30d": 0.4773,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 58.9% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-06-11",
-      "acc_7d": 0.589,
-      "acc_30d": 0.4648,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 58.9% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-06-12",
-      "acc_7d": 0.589,
-      "acc_30d": 0.472,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 58.9% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-06-15",
-      "acc_7d": 0.589,
-      "acc_30d": 0.4686,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 58.9% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-06-16",
-      "acc_7d": 0.589,
-      "acc_30d": 0.4671,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 58.9% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-06-17",
-      "acc_7d": 0.589,
-      "acc_30d": 0.4667,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 58.9% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-06-18",
-      "acc_7d": 0.589,
-      "acc_30d": 0.4635,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 58.9% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-06-22",
-      "acc_7d": 0.589,
-      "acc_30d": 0.4575,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 58.9% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-06-23",
-      "acc_7d": 0.589,
-      "acc_30d": 0.4551,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 58.9% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-06-24",
-      "acc_7d": 0.589,
-      "acc_30d": 0.457,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 58.9% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-06-25",
-      "acc_7d": 0.589,
-      "acc_30d": 0.4488,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 58.9% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-06-26",
-      "acc_7d": 0.589,
-      "acc_30d": 0.4422,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 58.9% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-06-29",
-      "acc_7d": 0.589,
-      "acc_30d": 0.4356,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 58.9% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-06-30",
-      "acc_7d": 0.589,
-      "acc_30d": 0.4323,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 58.9% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-07-10",
-      "acc_7d": 0.5897,
-      "acc_30d": 0.4351,
-      "samples_7": 78,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 59.0% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-07-13",
-      "acc_7d": 0.5897,
-      "acc_30d": 0.4513,
-      "samples_7": 78,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 59.0% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-07-14",
-      "acc_7d": 0.5769,
-      "acc_30d": 0.4578,
-      "samples_7": 78,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 57.7% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-07-15",
-      "acc_7d": 0.6548,
-      "acc_30d": 0.4888,
-      "samples_7": 84,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 65.5% 远超目标，选股门槛放宽 25% → 25%（挖掘更多机会）"
-    },
-    {
-      "date": "2026-07-16",
-      "acc_7d": 0.6471,
-      "acc_30d": 0.5112,
-      "samples_7": 85,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 64.7% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-07-17",
-      "acc_7d": 0.6471,
-      "acc_30d": 0.5208,
-      "samples_7": 85,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 64.7% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-07-20",
-      "acc_7d": 0.725,
-      "acc_30d": 0.5335,
-      "samples_7": 80,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 72.5% 远超目标，选股门槛放宽 25% → 25%（挖掘更多机会）"
-    },
-    {
-      "date": "2026-07-21",
-      "acc_7d": 0.72,
-      "acc_30d": 0.5304,
-      "samples_7": 75,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 72.0% 远超目标，选股门槛放宽 25% → 25%（挖掘更多机会）"
-    },
-    {
-      "date": "2026-07-22",
-      "acc_7d": 0.6933,
-      "acc_30d": 0.5399,
-      "samples_7": 75,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 69.3% 远超目标，选股门槛放宽 25% → 25%（挖掘更多机会）"
-    },
-    {
-      "date": "2026-07-23",
-      "acc_7d": 0.6667,
-      "acc_30d": 0.5335,
-      "samples_7": 75,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 66.7% 远超目标，选股门槛放宽 25% → 25%（挖掘更多机会）"
-    },
-    {
-      "date": "2026-07-24",
-      "acc_7d": 0.6857,
-      "acc_30d": 0.5431,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 68.6% 远超目标，选股门槛放宽 25% → 25%（挖掘更多机会）"
-    },
-    {
-      "date": "2026-07-27",
-      "acc_7d": 0.6286,
-      "acc_30d": 0.5495,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 62.9% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-07-28",
-      "acc_7d": 0.6,
-      "acc_30d": 0.5591,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 60.0% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-07-29",
-      "acc_7d": 0.5857,
-      "acc_30d": 0.5719,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 58.6% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-07-30",
-      "acc_7d": 0.6714,
-      "acc_30d": 0.5911,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 67.1% 远超目标，选股门槛放宽 25% → 25%（挖掘更多机会）"
-    },
-    {
-      "date": "2026-07-31",
-      "acc_7d": 0.6438,
-      "acc_30d": 0.5918,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 64.4% 达标，选股门槛微放宽 25% → 25%"
-    },
-    {
-      "date": "2026-08-03",
-      "acc_7d": 0.726,
-      "acc_30d": 0.6044,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 72.6% 远超目标，选股门槛放宽 25% → 25%（挖掘更多机会）"
-    },
-    {
       "date": "2026-08-04",
-      "acc_7d": 0.6164,
-      "acc_30d": 0.5981,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 61.6% 达标，选股门槛微放宽 25% → 25%"
+      "acc_7d": 0.7391,
+      "acc_30d": 0.397,
+      "samples_7": 23,
+      "buy_top_pct": 0.12,
+      "change": "近7日买入精准率 73.9% 远超目标，选股门槛放宽 10% → 12%（挖掘更多机会）",
+      "guardrail_triggered": true,
+      "guardrail_reason_text": "30日低精准率上限收敛",
+      "guardrail_reasons": [
+        "low_acc_30d_cap"
+      ]
     },
     {
       "date": "2026-08-05",
-      "acc_7d": 0.5753,
-      "acc_30d": 0.5918,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 57.5% 达标，选股门槛微放宽 25% → 25%"
+      "acc_7d": 0.88,
+      "acc_30d": 0.407,
+      "samples_7": 25,
+      "buy_top_pct": 0.14,
+      "change": "近7日买入精准率 88.0% 远超目标，选股门槛放宽 12% → 14%（挖掘更多机会）",
+      "guardrail_triggered": false,
+      "guardrail_reason_text": "无",
+      "guardrail_reasons": []
     },
     {
       "date": "2026-08-06",
-      "acc_7d": 0.589,
-      "acc_30d": 0.6044,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 58.9% 达标，选股门槛微放宽 25% → 25%"
+      "acc_7d": 0.8571,
+      "acc_30d": 0.407,
+      "samples_7": 35,
+      "buy_top_pct": 0.16,
+      "change": "近7日买入精准率 85.7% 远超目标，选股门槛放宽 14% → 16%（挖掘更多机会）",
+      "guardrail_triggered": false,
+      "guardrail_reason_text": "无",
+      "guardrail_reasons": []
     },
     {
       "date": "2026-08-07",
-      "acc_7d": 0.6027,
-      "acc_30d": 0.6171,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 60.3% 达标，选股门槛微放宽 25% → 25%"
+      "acc_7d": 0.7714,
+      "acc_30d": 0.4221,
+      "samples_7": 35,
+      "buy_top_pct": 0.18,
+      "change": "近7日买入精准率 77.1% 远超目标，选股门槛放宽 16% → 18%（挖掘更多机会）",
+      "guardrail_triggered": false,
+      "guardrail_reason_text": "无",
+      "guardrail_reasons": []
     },
     {
       "date": "2026-08-10",
-      "acc_7d": 0.5205,
-      "acc_30d": 0.6108,
-      "samples_7": 73,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 52.0% 低于目标，策略维持选股门槛 25%"
+      "acc_7d": 0.5429,
+      "acc_30d": 0.407,
+      "samples_7": 35,
+      "buy_top_pct": 0.18,
+      "change": "近7日买入精准率 54.3% 低于目标，策略维持选股门槛 18%",
+      "guardrail_triggered": false,
+      "guardrail_reason_text": "无",
+      "guardrail_reasons": []
     },
     {
       "date": "2026-08-11",
-      "acc_7d": 0.4714,
-      "acc_30d": 0.6044,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 47.1% 低于目标，策略维持选股门槛 25%"
+      "acc_7d": 0.4571,
+      "acc_30d": 0.4121,
+      "samples_7": 35,
+      "buy_top_pct": 0.18,
+      "change": "近7日买入精准率 45.7% 低于目标，策略维持选股门槛 18%",
+      "guardrail_triggered": false,
+      "guardrail_reason_text": "无",
+      "guardrail_reasons": []
     },
     {
       "date": "2026-08-12",
-      "acc_7d": 0.3857,
-      "acc_30d": 0.6013,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 38.6% 低于目标，策略维持选股门槛 25%"
+      "acc_7d": 0.4571,
+      "acc_30d": 0.4472,
+      "samples_7": 35,
+      "buy_top_pct": 0.18,
+      "change": "近7日买入精准率 45.7% 低于目标，策略维持选股门槛 18%",
+      "guardrail_triggered": false,
+      "guardrail_reason_text": "无",
+      "guardrail_reasons": []
     },
     {
       "date": "2026-08-13",
-      "acc_7d": 0.4714,
-      "acc_30d": 0.5981,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 47.1% 低于目标，策略维持选股门槛 25%"
+      "acc_7d": 0.4571,
+      "acc_30d": 0.4523,
+      "samples_7": 35,
+      "buy_top_pct": 0.18,
+      "change": "近7日买入精准率 45.7% 低于目标，策略维持选股门槛 18%",
+      "guardrail_triggered": false,
+      "guardrail_reason_text": "无",
+      "guardrail_reasons": []
     },
     {
       "date": "2026-08-14",
-      "acc_7d": 0.5714,
-      "acc_30d": 0.6076,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 57.1% 达标，选股门槛微放宽 25% → 25%"
+      "acc_7d": 0.4,
+      "acc_30d": 0.4523,
+      "samples_7": 35,
+      "buy_top_pct": 0.18,
+      "change": "近7日买入精准率 40.0% 低于目标，策略维持选股门槛 18%",
+      "guardrail_triggered": false,
+      "guardrail_reason_text": "无",
+      "guardrail_reasons": []
     },
     {
       "date": "2026-08-17",
-      "acc_7d": 0.5714,
-      "acc_30d": 0.6215,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 57.1% 达标，选股门槛微放宽 25% → 25%"
+      "acc_7d": 0.3714,
+      "acc_30d": 0.4774,
+      "samples_7": 35,
+      "buy_top_pct": 0.18,
+      "change": "近7日买入精准率 37.1% 低于目标，策略维持选股门槛 18%",
+      "guardrail_triggered": false,
+      "guardrail_reason_text": "无",
+      "guardrail_reasons": []
     },
     {
       "date": "2026-08-18",
-      "acc_7d": 0.6,
-      "acc_30d": 0.6226,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 60.0% 达标，选股门槛微放宽 25% → 25%"
+      "acc_7d": 0.4286,
+      "acc_30d": 0.4673,
+      "samples_7": 35,
+      "buy_top_pct": 0.18,
+      "change": "近7日买入精准率 42.9% 低于目标，策略维持选股门槛 18%",
+      "guardrail_triggered": false,
+      "guardrail_reason_text": "无",
+      "guardrail_reasons": []
     },
     {
       "date": "2026-08-19",
-      "acc_7d": 0.6571,
-      "acc_30d": 0.6195,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 65.7% 远超目标，选股门槛放宽 25% → 25%（挖掘更多机会）"
+      "acc_7d": 0.3429,
+      "acc_30d": 0.4573,
+      "samples_7": 35,
+      "buy_top_pct": 0.17,
+      "change": "近7日买入精准率 34.3% 远低于目标 55%，选股门槛小幅收严 18% → 17%",
+      "guardrail_triggered": false,
+      "guardrail_reason_text": "无",
+      "guardrail_reasons": []
     },
     {
       "date": "2026-08-20",
-      "acc_7d": 0.7143,
-      "acc_30d": 0.6326,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 71.4% 远超目标，选股门槛放宽 25% → 25%（挖掘更多机会）"
+      "acc_7d": 0.2571,
+      "acc_30d": 0.4472,
+      "samples_7": 35,
+      "buy_top_pct": 0.16,
+      "change": "近7日买入精准率 25.7% 远低于目标 55%，选股门槛小幅收严 17% → 16%",
+      "guardrail_triggered": false,
+      "guardrail_reason_text": "无",
+      "guardrail_reasons": []
     },
     {
       "date": "2026-08-21",
-      "acc_7d": 0.7,
-      "acc_30d": 0.6266,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 70.0% 远超目标，选股门槛放宽 25% → 25%（挖掘更多机会）"
+      "acc_7d": 0.2571,
+      "acc_30d": 0.4523,
+      "samples_7": 35,
+      "buy_top_pct": 0.15,
+      "change": "近7日买入精准率 25.7% 远低于目标 55%，选股门槛小幅收严 16% → 15%",
+      "guardrail_triggered": false,
+      "guardrail_reason_text": "无",
+      "guardrail_reasons": []
     },
     {
       "date": "2026-08-24",
-      "acc_7d": 0.6714,
-      "acc_30d": 0.6169,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 67.1% 远超目标，选股门槛放宽 25% → 25%（挖掘更多机会）"
+      "acc_7d": 0.3714,
+      "acc_30d": 0.4673,
+      "samples_7": 35,
+      "buy_top_pct": 0.15,
+      "change": "近7日买入精准率 37.1% 低于目标，策略维持选股门槛 15%",
+      "guardrail_triggered": false,
+      "guardrail_reason_text": "无",
+      "guardrail_reasons": []
     },
     {
       "date": "2026-08-25",
-      "acc_7d": 0.6286,
-      "acc_30d": 0.6201,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 62.9% 达标，选股门槛微放宽 25% → 25%"
+      "acc_7d": 0.4857,
+      "acc_30d": 0.4804,
+      "samples_7": 35,
+      "buy_top_pct": 0.15,
+      "change": "近7日买入精准率 48.6% 低于目标，策略维持选股门槛 15%",
+      "guardrail_triggered": false,
+      "guardrail_reason_text": "无",
+      "guardrail_reasons": []
     },
     {
       "date": "2026-08-26",
-      "acc_7d": 0.5571,
-      "acc_30d": 0.5974,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 55.7% 达标，选股门槛微放宽 25% → 25%"
+      "acc_7d": 0.4889,
+      "acc_30d": 0.4813,
+      "samples_7": 45,
+      "buy_top_pct": 0.15,
+      "change": "近7日买入精准率 48.9% 低于目标，策略维持选股门槛 15%",
+      "guardrail_triggered": false,
+      "guardrail_reason_text": "无",
+      "guardrail_reasons": []
     },
     {
       "date": "2026-08-27",
-      "acc_7d": 0.4571,
-      "acc_30d": 0.5776,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 45.7% 低于目标，策略维持选股门槛 25%"
+      "acc_7d": 0.44,
+      "acc_30d": 0.4703,
+      "samples_7": 50,
+      "buy_top_pct": 0.15,
+      "change": "近7日买入精准率 44.0% 低于目标，策略维持选股门槛 15%",
+      "guardrail_triggered": false,
+      "guardrail_reason_text": "无",
+      "guardrail_reasons": []
     },
     {
       "date": "2026-08-28",
-      "acc_7d": 0.4,
-      "acc_30d": 0.5611,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 40.0% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-08-31",
-      "acc_7d": 0.4143,
-      "acc_30d": 0.5578,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 41.4% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-09-01",
-      "acc_7d": 0.4571,
-      "acc_30d": 0.5644,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 45.7% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-09-02",
-      "acc_7d": 0.5,
-      "acc_30d": 0.571,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 50.0% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-09-03",
-      "acc_7d": 0.5429,
-      "acc_30d": 0.5908,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 54.3% 低于目标，策略维持选股门槛 25%"
-    },
-    {
-      "date": "2026-09-04",
-      "acc_7d": 0.6429,
-      "acc_30d": 0.5875,
-      "samples_7": 70,
-      "buy_top_pct": 0.25,
-      "change": "近7日买入精准率 64.3% 达标，选股门槛微放宽 25% → 25%"
+      "acc_7d": 0.4333,
+      "acc_30d": 0.4672,
+      "samples_7": 60,
+      "buy_top_pct": 0.15,
+      "change": "近7日买入精准率 43.3% 低于目标，策略维持选股门槛 15%",
+      "guardrail_triggered": false,
+      "guardrail_reason_text": "无",
+      "guardrail_reasons": []
     }
-  ]
+  ],
+  "last_thresh_buy": 0.6,
+  "last_thresh_watch": 0.6,
+  "last_scan_date": "2026-09-07",
+  "last_scan_total": 5207,
+  "last_guardrail_trace": {
+    "state": "range",
+    "min_pct": 0.08,
+    "max_pct": 0.2,
+    "buy_top_pct_before": 0.15,
+    "buy_top_pct_after": 0.15,
+    "cap_triggered": false,
+    "acc_30d": 0.4672,
+    "acc_30d_threshold": 0.4,
+    "cap_max_pct": 0.12,
+    "triggered": false,
+    "reasons": [],
+    "reason_text": "无",
+    "summary": "护栏追踪：range 区间 8%~20%，门槛 15%→15%，触发原因：无"
+  }
 }

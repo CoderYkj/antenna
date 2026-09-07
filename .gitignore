@@ -43,3 +43,7 @@ data/cache/alt/*
 
 # Local code-intelligence tool cache (machine-local, not for committing)
 .codegraph/
+
+# Linux server deployment runtime (added during git repair 2026-09-07)
+.venv/
+.git.broken.bak

@@ -32,6 +32,131 @@ model:
 reports:
   output_dir:   reports/output
 
+scan:
+  workers:      8
+  # 推荐重排打分参数（可选）
+  recommend_scoring:
+    w_prob:               0.62
+    w_rank:               0.18
+    w_momentum:           0.12
+    w_resonance:          0.08
+    w_tactic_precision:   0.40
+    atr_ref:              0.06
+    atr_penalty_scale:    0.70
+    atr_penalty_cap:      0.10
+    drawdown_ref:        -0.35
+    drawdown_penalty_scale: 0.25
+    drawdown_penalty_cap:   0.08
+    momentum_divisor:     2.0
+  # 推荐提精闸门（近期命中率走弱时，自动收紧低质量买入候选）
+  recommend_precision_gate:
+    enabled:              true
+    min_samples_7d:       15
+    min_samples_30d:      60
+    weak_acc_7d:          0.54
+    weak_acc_30d:         0.50
+    hard_acc_30d:         0.42
+    min_recommend_score_weak: 0.44
+    min_rise_prob_weak:   0.57
+    min_resonance_weak:   1
+    min_recommend_score_hard: 0.48
+    min_rise_prob_hard:   0.60
+    min_resonance_hard:   2
+    protect_top_buy_weak: 3
+    protect_top_buy_hard: 2
+    max_demote_ratio_weak: 0.50
+    max_demote_ratio_hard: 0.65
+    use_prob_bin_guard:   true
+    prob_bin_min_samples: 12
+    prob_bin_min_hit_rate_weak: 0.48
+    prob_bin_min_hit_rate_hard: 0.52
+    use_confidence_guard: true
+    confidence_min_samples: 12
+    confidence_min_hit_rate_weak:
+      高: 0.52
+      中: 0.48
+      低: 0.44
+    confidence_min_hit_rate_hard:
+      高: 0.55
+      中: 0.50
+      低: 0.46
+    use_tactic_guard:     true
+    tactic_min_samples:   30
+    tactic_min_precision_weak: 0.50
+    tactic_min_precision_hard: 0.54
+    use_symbol_memory_guard: true
+    symbol_memory_window_days: 30
+    symbol_memory_min_samples: 3
+    symbol_memory_min_hit_rate_weak: 0.40
+    symbol_memory_min_hit_rate_hard: 0.45
+    use_payoff_guard:      true
+    payoff_min_gain_weak:  2.0
+    payoff_min_gain_hard:  2.5
+    payoff_min_ratio_weak: 0.45
+    payoff_min_ratio_hard: 0.60
+    payoff_min_risk_pct:   6.0
+    use_technical_guard:   true
+    tech_min_confirmations_weak: 2
+    tech_min_confirmations_hard: 3
+    tech_min_available_checks: 3
+    tech_rsi_floor_weak:    50
+    tech_rsi_floor_hard:    53
+    tech_vol_ratio_floor_weak: 1.0
+    tech_vol_ratio_floor_hard: 1.1
+    use_symbol_risk_guard:  true
+    symbol_risk_window_days: 45
+    symbol_risk_min_samples: 3
+    symbol_risk_dd_threshold: -0.10
+    symbol_risk_max_rate_weak: 0.55
+    symbol_risk_max_rate_hard: 0.45
+    use_liquidity_guard:   true
+    liquidity_min_turnover_weak: 1.0
+    liquidity_min_turnover_hard: 1.8
+    liquidity_max_turnover_weak: 25.0
+    liquidity_max_turnover_hard: 20.0
+    liquidity_min_vol_ratio_weak: 0.9
+    liquidity_min_vol_ratio_hard: 1.0
+    use_trend_guard:       true
+    trend_min_hits_weak:   2
+    trend_min_hits_hard:   3
+    trend_min_available_checks: 3
+    trend_close_buffer_weak: -0.01
+    trend_close_buffer_hard: 0.0
+    use_extension_guard:   true
+    max_close_ma20_dev_weak: 0.12
+    max_close_ma20_dev_hard: 0.08
+    use_volatility_guard:  true
+    atr_pct_max_weak:      0.10
+    atr_pct_max_hard:      0.07
+    use_edge_guard:        true
+    edge_min_prob_weak:    0.008
+    edge_min_prob_hard:    0.015
+    use_dual_target_guard: true
+    dual_min_short_gain_weak: 1.5
+    dual_min_short_gain_hard: 2.0
+    dual_min_long_gain_weak: 2.2
+    dual_min_long_gain_hard: 3.0
+    dual_min_long_short_ratio_weak: 0.75
+    dual_min_long_short_ratio_hard: 0.90
+    use_atr_reward_guard:   true
+    min_gain_atr_ratio_weak: 1.00
+    min_gain_atr_ratio_hard: 1.25
+    adaptive_tuning:
+      enabled: true
+      sample_target_7d: 20
+      sample_target_30d: 90
+      weak_soft_margin_7d: 0.02
+      weak_soft_margin_30d: 0.02
+      hard_strict_margin_30d: 0.05
+      soft_min_factor: 0.90
+      soft_max_factor: 1.10
+      soft_count_delta: -1
+      soft_demote_ratio_factor: 0.85
+      strict_min_factor: 1.10
+      strict_max_factor: 0.90
+      strict_count_delta: 1
+      strict_demote_ratio_factor: 1.10
+
 # ── 飞书集成 ────────────────────────────────────────────────
 feishu:
   # 单向 Webhook(自定义机器人,可选;为空则跳过定时推送)

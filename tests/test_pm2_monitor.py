@@ -153,6 +153,17 @@ def test_logs_returns_html(client):
         resp = _auth(client, "/logs/antenna-bot")
     assert resp.status_code == 200
     assert b"log line 1" in resp.data
+    assert b"/api/logs/" in resp.data
+
+
+def test_api_logs_returns_json(client):
+    from server import pm2_monitor
+    with patch.object(pm2_monitor, "_pm2", return_value=(0, "line x", "")):
+        resp = _auth(client, "/api/logs/antenna-bot")
+    assert resp.status_code == 200
+    data = json.loads(resp.data)
+    assert data["name"] == "antenna-bot"
+    assert data["text"] == "line x"
 
 
 def test_api_processes_returns_json(client):

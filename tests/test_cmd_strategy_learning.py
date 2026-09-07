@@ -67,6 +67,69 @@ def test_cmd_strategy_learning_panel_degrades_gracefully():
     assert len(card["elements"]) > 0
 
 
+def test_cmd_strategy_contains_guardrail_and_positioning_lines():
+    strategy = {
+        "buy_top_pct": 0.10,
+        "history": [
+            {
+                "date": "2026-01-02",
+                "buy_top_pct": 0.12,
+                "acc_7d": 0.51,
+                "change": "测试",
+                "guardrail_triggered": True,
+                "guardrail_reason_text": "状态区间限幅",
+            }
+        ],
+        "risk_guardrails": {
+            "by_state_bounds": {"range": {"min": 0.08, "max": 0.20}},
+            "low_accuracy_cap": {"acc_30d_threshold": 0.40, "max_buy_top_pct": 0.12},
+        },
+        "positioning": {"bull": 1.0, "range": 0.6, "bear": 0.3},
+    }
+    with patch("pathlib.Path.read_text", side_effect=FileNotFoundError), \
+         patch("learning.market_state.load_current_state", return_value={"current": "range"}), \
+         patch("learning.optimizer.load_strategy", return_value=strategy), \
+         patch("learning.optimizer.rolling_accuracy", return_value=(0.56, 6, 10)), \
+         patch("learning.tracker.list_prediction_dates", return_value=[]):
+        from server.predict_cmd import cmd_strategy
+        result = cmd_strategy()
+
+    card = json.loads(result["content"])
+    all_text = " ".join(e.get("content", "") for e in card["elements"] if e.get("tag") == "markdown")
+    assert "风险护栏" in all_text
+    assert "仓位建议" in all_text
+    assert "30日精准率 < 40%" in all_text
+    assert "近期护栏触发" in all_text
+    assert "状态区间限幅" in all_text
+    assert "30日护栏统计" in all_text
+
+
+def test_cmd_strategy_contains_precision_alerts():
+    strategy = {"buy_top_pct": 0.10, "history": []}
+    metrics = {
+        "windows": {
+            "7d": {"hit_rate": 0.52, "samples": 12, "avg_return": 0.01, "max_drawdown": -0.04, "topn_hit_rate": {"top5": 0.6}, "topn_samples": {"top5": 12}},
+            "30d": {"hit_rate": 0.58, "samples": 40, "avg_return": 0.015, "max_drawdown": -0.07, "topn_hit_rate": {"top5": 0.62}, "topn_samples": {"top5": 40}},
+        },
+        "alerts": [
+            {"level": "warning", "code": "hit_rate_drift", "message": "近7日命中率低于30日，短期质量走弱。"},
+        ],
+    }
+    with patch("pathlib.Path.read_text", side_effect=FileNotFoundError), \
+         patch("learning.market_state.load_current_state", return_value={"current": "range"}), \
+         patch("learning.optimizer.load_strategy", return_value=strategy), \
+         patch("learning.optimizer.rolling_accuracy", return_value=(0.52, 6, 12)), \
+         patch("learning.optimizer.build_monitor_dashboard_metrics", return_value=metrics), \
+         patch("learning.tracker.list_prediction_dates", return_value=[]):
+        from server.predict_cmd import cmd_strategy
+        result = cmd_strategy()
+
+    card = json.loads(result["content"])
+    all_text = " ".join(e.get("content", "") for e in card["elements"] if e.get("tag") == "markdown")
+    assert "提精风险告警" in all_text
+    assert "短期质量走弱" in all_text
+
+
 def test_tactic_precision_line_returns_text():
     tp_data = {"params": {"bull": {"value": {"precision": 0.65, "samples": 12}}}}
     with patch("learning.market_state.load_current_state", return_value={"current": "bull"}), \

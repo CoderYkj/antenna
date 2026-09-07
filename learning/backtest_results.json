@@ -5,25 +5,25 @@
       "period_type": "year",
       "start": "2026-01-01",
       "end": "2026-12-31",
-      "total_buy_sigs": 995,
-      "total_hits": 415,
-      "accuracy": 0.4171,
-      "trading_days": 102,
-      "days_with_buys": 101,
+      "total_buy_sigs": 587,
+      "total_hits": 181,
+      "accuracy": 0.3083,
+      "trading_days": 60,
+      "days_with_buys": 59,
       "best_day": {
-        "date": "2026-01-19",
-        "hits": 9,
-        "total": 9,
+        "date": "2026-03-24",
+        "hits": 10,
+        "total": 10,
         "accuracy": 1.0
       },
       "worst_day": {
-        "date": "2026-03-05",
+        "date": "2026-01-07",
         "hits": 0,
         "total": 10,
         "accuracy": 0.0
       },
-      "final_buy_top_pct": 0.25,
-      "completed_at": "2026-06-10T09:11:40.935252"
+      "final_buy_top_pct": 0.14,
+      "completed_at": "2026-04-16T23:35:40.368276"
     },
     {
       "period": "2026-04",
@@ -51,29 +51,29 @@
       "completed_at": "2026-04-25T15:42:09.891397"
     },
     {
-      "period": "2026-06",
+      "period": "2026-08",
       "period_type": "month",
-      "start": "2026-06-01",
-      "end": "2026-06-30",
-      "total_buy_sigs": 200,
-      "total_hits": 75,
-      "accuracy": 0.375,
-      "trading_days": 21,
-      "days_with_buys": 20,
+      "start": "2026-08-01",
+      "end": "2026-08-31",
+      "total_buy_sigs": 190,
+      "total_hits": 89,
+      "accuracy": 0.4684,
+      "trading_days": 20,
+      "days_with_buys": 19,
       "best_day": {
-        "date": "2026-06-12",
-        "hits": 7,
+        "date": "2026-08-04",
+        "hits": 10,
         "total": 10,
-        "accuracy": 0.7
+        "accuracy": 1.0
       },
       "worst_day": {
-        "date": "2026-06-03",
+        "date": "2026-08-19",
         "hits": 0,
         "total": 10,
         "accuracy": 0.0
       },
-      "final_buy_top_pct": 0.25,
-      "completed_at": "2026-07-09T17:20:00.640010"
+      "final_buy_top_pct": 0.15,
+      "completed_at": "2026-08-31T17:36:52.672533"
     }
   ]
 }
