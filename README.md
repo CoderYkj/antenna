@@ -108,6 +108,9 @@ antenna/
 │   ├── backfill_market_state.py   # P1 沪深 300 历史回放
 │   ├── replay_learn.py            # 学习系统回放 / P1 验收
 │   ├── check_alt_ic.py            # P3 alt 特征 IC 有效性离线验证
+│   ├── smoke_test.py              # 功能冒烟测试（部署后快速健康检查）
+│   ├── deploy_linux.sh            # Linux 一键更新部署（拉代码/装依赖/重启 PM2）
+│   ├── deploy_remote.py           # 本地一键发布到远端 Linux（打包上传 + 触发部署）
 │   ├── task_scan.py               # 定时扫描（含 alt_data 批量拉取）
 │   ├── task_predict.py            # 盘中预测（动态特征列 + alt_data 注入）
 │   ├── task_daily_review.py       # 收盘复盘
@@ -280,6 +283,7 @@ python cli.py <subcommand> [options]
 | `学习 (日期)`  | `学习` / `学习 2026-04-29` | 跑全部 6 个学习模块                   |
 | `学习 dry-run` | `学习 演练`                  | 演练，不写盘                          |
 | `策略`         | `策略`                       | 当前选股门槛、精准率、7天/30天看板核心指标 |
+| `训练 (加权)`  | `训练` / `训练 加权`      | 重新训练 LightGBM 模型（约 10-20 分钟，加权=P1 错样本加权重训） |
 
 #### 其他
 
@@ -617,6 +621,9 @@ pm2 logs antenna-bot --lines 100  # 查看日志
 
 日志文件路径：`logs/pm2-out.log` / `logs/pm2-error.log`。
 
+飞书后台指令（`推荐`/`战法`）在独立线程中执行，异常除了写入常规日志外，还会追加一条含完整
+traceback 的记录到 `logs/critical_errors.jsonl`（不受日志轮转/进程重启影响），故障排查时优先看这个文件。
+
 ### Linux 更新部署（推荐）
 
 仓库内置一键脚本 `scripts/deploy_linux.sh`，用于：
@@ -761,7 +768,7 @@ python cli.py style                    # 真实写入 learning/persona.txt
 - **推送**：多通道扇出（飞书 Webhook + 企业微信自建应用，并行执行）
 - **进程管理**：PM2（Node.js）+ Windows 任务计划
 - **存储**：Parquet（行情缓存 + alt 缓存）+ JSONL（pred / outcome 归档）
-- **测试**：pytest（402 用例，覆盖学习系统全链路）
+- **测试**：pytest（480 用例，覆盖学习系统全链路）
 
 ---
 
