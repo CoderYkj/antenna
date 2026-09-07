@@ -30,6 +30,7 @@ Look
 Set
 
 # Learning system runtime artifacts (P0+)
+learning/data/
 learning/feedback/
 learning/history/
 learning/alerts.jsonl
