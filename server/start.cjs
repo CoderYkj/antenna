@@ -1,7 +1,9 @@
 const { spawn } = require('child_process');
 const path = require('path');
 
-const proc = spawn('python', [path.join(__dirname, 'feishu_poll.py')], {
+const pythonBin = process.env.ANTENNA_PYTHON || (process.platform === 'win32' ? 'python' : 'python3');
+
+const proc = spawn(pythonBin, [path.join(__dirname, 'feishu_poll.py')], {
   cwd: path.join(__dirname, '..'),
   stdio: 'inherit',
   windowsHide: true,

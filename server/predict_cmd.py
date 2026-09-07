@@ -565,7 +565,7 @@ def cmd_review(date_str: str = None) -> dict:
     from learning.tracker import (
         load_predictions, log_outcomes, list_prediction_dates, load_outcomes
     )
-    from learning.optimizer import build_review_report, RISE_THRESHOLD
+    from learning.optimizer import build_review_report, build_guardrail_trace_text, RISE_THRESHOLD
     from data.fetcher import fetch_realtime_prices, fetch_stock_hist
 
     # 确定复盘日期
@@ -645,6 +645,9 @@ def cmd_review(date_str: str = None) -> dict:
     report = build_review_report(date_str)
     day_result  = report.get("day_result")
     strategy    = report.get("strategy", {})
+    guardrail_trace = report.get("guardrail_trace", {})
+    guardrail_trace_text = report.get("guardrail_trace_text", "")
+    guardrail_summary = report.get("guardrail_summary", {})
     change_desc = report.get("change_desc", "")
     acc_7d      = report.get("acc_7d", 0)
     acc_30d     = report.get("acc_30d", 0)
@@ -652,6 +655,17 @@ def cmd_review(date_str: str = None) -> dict:
     samples_30  = report.get("samples_30", 0)
 
     buy_top_pct = strategy.get("buy_top_pct", 0.10)
+
+    guardrail_line = guardrail_trace_text or build_guardrail_trace_text(guardrail_trace)
+    guardrail_line = guardrail_line.replace("，", "　")
+    summary_line = ""
+    if guardrail_summary.get("total_days", 0) > 0:
+        top_items = guardrail_summary.get("top_reasons") or []
+        top_str = "、".join(f"{x['label']}×{x['count']}" for x in top_items[:3]) if top_items else "无"
+        summary_line = (
+            f"30日护栏：触发 **{guardrail_summary['trigger_days']} / {guardrail_summary['total_days']}**"
+            f"（{guardrail_summary['trigger_rate']:.0%}）　主要原因 {top_str}"
+        )
 
     # ── 构建卡片 elements ──────────────────────────────────
     elements = []
@@ -786,7 +800,9 @@ def cmd_review(date_str: str = None) -> dict:
     # 策略自优化说明
     strategy_text = (
         f"**策略自优化** — 当前门槛：前 **{buy_top_pct:.0%}**\n"
-        f"{change_desc}"
+        f"{change_desc}\n"
+        f"{guardrail_line}"
+        + (f"\n{summary_line}" if summary_line else "")
     )
     elements.append({"tag": "markdown", "content": strategy_text})
 
@@ -992,6 +1008,1009 @@ def _tier_split(enriched: list) -> tuple[list, list]:
     return tier1, tier2
 
 
+def _load_recommend_scoring_cfg() -> dict:
+    """读取推荐重排参数，缺省返回保守默认值。"""
+    cfg = _load_cfg()
+    scan_cfg = cfg.get("scan", {}) if isinstance(cfg, dict) else {}
+    score_cfg = scan_cfg.get("recommend_scoring", {}) if isinstance(scan_cfg, dict) else {}
+    return score_cfg if isinstance(score_cfg, dict) else {}
+
+
+def _load_recommend_precision_gate_cfg() -> dict:
+    """读取推荐提精闸门参数。"""
+    cfg = _load_cfg()
+    scan_cfg = cfg.get("scan", {}) if isinstance(cfg, dict) else {}
+    gate_cfg = scan_cfg.get("recommend_precision_gate", {}) if isinstance(scan_cfg, dict) else {}
+    return gate_cfg if isinstance(gate_cfg, dict) else {}
+
+
+def _load_recent_accuracy_context(strategy: dict) -> dict:
+    """获取近期精准率上下文，优先实时重算，失败回退 strategy 缓存值。"""
+    try:
+        from learning.optimizer import rolling_accuracy
+        acc_7d, _, samples_7d = rolling_accuracy(7)
+        acc_30d, _, samples_30d = rolling_accuracy(30)
+        return {
+            "acc_7d": float(acc_7d),
+            "acc_30d": float(acc_30d),
+            "samples_7d": int(samples_7d),
+            "samples_30d": int(samples_30d),
+        }
+    except Exception as err:
+        log.warning(f"[scan_bot] load rolling_accuracy failed, fallback strategy cache: {err}")
+        return {
+            "acc_7d": float(strategy.get("accuracy_7d", 0.0) or 0.0),
+            "acc_30d": float(strategy.get("accuracy_30d", 0.0) or 0.0),
+            "samples_7d": int((strategy.get("history") or [{}])[-1].get("samples_7", 0) or 0),
+            "samples_30d": 0,
+        }
+
+
+def _prob_bin_label(rise_prob: float) -> str:
+    p = float(rise_prob or 0.0)
+    if p < 0.60:
+        return "[0.55,0.60)"
+    if p < 0.65:
+        return "[0.60,0.65)"
+    return "[0.65,1.00]"
+
+
+def _load_prob_bin_precision_stats() -> dict:
+    """
+    读取 30d 概率分桶命中率与样本，用于提精闸门。
+    返回: label -> {hit_rate, samples}
+    """
+    try:
+        from learning.optimizer import build_monitor_dashboard_metrics
+
+        metrics = build_monitor_dashboard_metrics()
+        windows = metrics.get("windows", {}) if isinstance(metrics, dict) else {}
+        w30 = windows.get("30d", {}) if isinstance(windows, dict) else {}
+        rates = w30.get("prob_bin_hit_rate", {}) if isinstance(w30, dict) else {}
+        samples = w30.get("prob_bin_samples", {}) if isinstance(w30, dict) else {}
+        out = {}
+        for label, rate in rates.items():
+            out[str(label)] = {
+                "hit_rate": float(rate or 0.0),
+                "samples": int((samples or {}).get(label, 0) or 0),
+            }
+        return out
+    except Exception as err:
+        log.warning(f"[scan_bot] load prob-bin precision stats failed: {err}")
+        return {}
+
+
+def _normalize_confidence_label(confidence: str) -> str:
+    c = str(confidence or "").strip().lower()
+    if c in ("高", "high", "h"):
+        return "高"
+    if c in ("低", "low", "l"):
+        return "低"
+    return "中"
+
+
+def _load_confidence_precision_stats() -> dict:
+    """
+    读取 30d 置信度分层命中率与样本，用于提精闸门。
+    返回: 高/中/低 -> {hit_rate, samples}
+    """
+    try:
+        from learning.optimizer import build_monitor_dashboard_metrics
+
+        metrics = build_monitor_dashboard_metrics()
+        windows = metrics.get("windows", {}) if isinstance(metrics, dict) else {}
+        w30 = windows.get("30d", {}) if isinstance(windows, dict) else {}
+        rates = w30.get("confidence_hit_rate", {}) if isinstance(w30, dict) else {}
+        samples = w30.get("confidence_samples", {}) if isinstance(w30, dict) else {}
+        out = {}
+        for label in ("高", "中", "低"):
+            out[label] = {
+                "hit_rate": float((rates or {}).get(label, 0.0) or 0.0),
+                "samples": int((samples or {}).get(label, 0) or 0),
+            }
+        return out
+    except Exception as err:
+        log.warning(f"[scan_bot] load confidence precision stats failed: {err}")
+        return {}
+
+
+def _confidence_threshold_map(cfg: dict, mode: str) -> dict:
+    default = {
+        "weak": {"高": 0.52, "中": 0.48, "低": 0.44},
+        "hard": {"高": 0.55, "中": 0.50, "低": 0.46},
+    }
+    key = "confidence_min_hit_rate_hard" if mode == "hard" else "confidence_min_hit_rate_weak"
+    raw = cfg.get(key)
+    if isinstance(raw, dict):
+        merged = dict(default["hard" if mode == "hard" else "weak"])
+        for k in ("高", "中", "低"):
+            if k in raw:
+                merged[k] = float(raw[k])
+        return merged
+    return dict(default["hard" if mode == "hard" else "weak"])
+
+
+def _resolve_adaptive_tuning_profile(
+    cfg: dict,
+    mode: str,
+    summary: dict,
+    *,
+    weak_acc_7d: float,
+    weak_acc_30d: float,
+    hard_acc_30d: float,
+) -> dict:
+    """
+    根据当前精度压力返回阈值调优档位：
+      - soft: 接近阈值边界时，轻微放松，减少误杀
+      - neutral: 默认
+      - strict: 明显失压时，进一步收紧
+    """
+    base = {
+        "level": "neutral",
+        "min_factor": 1.0,
+        "max_factor": 1.0,
+        "count_delta": 0,
+        "demote_ratio_factor": 1.0,
+        "strength": 0.0,
+    }
+    tuning = cfg.get("adaptive_tuning", {}) if isinstance(cfg, dict) else {}
+    if not isinstance(tuning, dict) or not bool(tuning.get("enabled", True)):
+        return base
+
+    acc7 = float(summary.get("acc_7d", 0.0) or 0.0)
+    acc30 = float(summary.get("acc_30d", 0.0) or 0.0)
+    s7 = int(summary.get("samples_7d", 0) or 0)
+    s30 = int(summary.get("samples_30d", 0) or 0)
+    target7 = max(1, int(tuning.get("sample_target_7d", 20)))
+    target30 = max(1, int(tuning.get("sample_target_30d", 90)))
+    strength = min(1.0, max(0.0, min(s7 / target7, s30 / target30)))
+
+    def _blend_factor(raw: float) -> float:
+        # 样本不足时向 1.0 回归，避免过度调参
+        return 1.0 + (float(raw) - 1.0) * strength
+
+    def _blend_count(raw: int) -> int:
+        if raw == 0:
+            return 0
+        return int(round(int(raw) * strength))
+
+    soft_margin_7d = float(tuning.get("weak_soft_margin_7d", 0.02))
+    soft_margin_30d = float(tuning.get("weak_soft_margin_30d", 0.02))
+    strict_margin_30d = float(tuning.get("hard_strict_margin_30d", 0.05))
+
+    if mode == "weak" and acc7 >= weak_acc_7d - soft_margin_7d and acc30 >= weak_acc_30d - soft_margin_30d:
+        return {
+            "level": "soft",
+            "min_factor": _blend_factor(float(tuning.get("soft_min_factor", 0.90))),
+            "max_factor": _blend_factor(float(tuning.get("soft_max_factor", 1.10))),
+            "count_delta": _blend_count(int(tuning.get("soft_count_delta", -1))),
+            "demote_ratio_factor": _blend_factor(float(tuning.get("soft_demote_ratio_factor", 0.85))),
+            "strength": round(strength, 3),
+        }
+    if mode == "hard" and acc30 <= hard_acc_30d - strict_margin_30d:
+        return {
+            "level": "strict",
+            "min_factor": _blend_factor(float(tuning.get("strict_min_factor", 1.10))),
+            "max_factor": _blend_factor(float(tuning.get("strict_max_factor", 0.90))),
+            "count_delta": _blend_count(int(tuning.get("strict_count_delta", 1))),
+            "demote_ratio_factor": _blend_factor(float(tuning.get("strict_demote_ratio_factor", 1.10))),
+            "strength": round(strength, 3),
+        }
+    return base
+
+
+def _load_recent_symbol_buy_stats(codes: list[str], strategy: dict, window_days: int = 30) -> dict:
+    """
+    统计近 window_days 内个股买入命中情况（仅 scene=scan，排除 watchlist）。
+    返回: code -> {hit_rate, samples}
+    """
+    if not codes:
+        return {}
+    try:
+        from learning.tracker import list_prediction_dates, load_predictions, load_outcomes
+    except Exception as err:
+        log.warning(f"[scan_bot] load tracker helpers failed: {err}")
+        return {}
+
+    tracked = {str(c) for c in codes if c}
+    if not tracked:
+        return {}
+    rise_target = float(strategy.get("rise_target_pct", 1.0) or 1.0)
+    dates = list_prediction_dates()
+    recent = dates[-window_days:] if len(dates) >= window_days else dates
+
+    stats = {code: {"hits": 0, "samples": 0} for code in tracked}
+    for d in recent:
+        preds = load_predictions(d) or []
+        outs = load_outcomes(d) or {}
+        if not preds or not outs:
+            continue
+        for p in preds:
+            code = str(p.get("code") or "")
+            if code not in tracked:
+                continue
+            if p.get("scene") not in (None, "", "scan"):
+                continue
+            if p.get("watchlist"):
+                continue
+            if p.get("signal") != "买入":
+                continue
+            actual_pct = (outs.get(code) or {}).get("actual_pct")
+            if actual_pct is None:
+                continue
+            stats[code]["samples"] += 1
+            stats[code]["hits"] += int(float(actual_pct) >= rise_target)
+
+    out = {}
+    for code, s in stats.items():
+        n = int(s.get("samples", 0))
+        if n <= 0:
+            continue
+        hit_rate = float(s.get("hits", 0)) / n
+        out[code] = {"hit_rate": hit_rate, "samples": n}
+    return out
+
+
+def _load_recent_symbol_risk_stats(codes: list[str], window_days: int = 30, severe_dd_threshold: float = -0.10) -> dict:
+    """
+    统计近 window_days 内个股 5 日回撤风险。
+    返回: code -> {severe_rate, samples}
+    severe_rate = max_drawdown_5d 触发严重回撤阈值的比例（阈值由调用侧控制）。
+    """
+    if not codes:
+        return {}
+    try:
+        from learning.tracker import list_prediction_dates, load_predictions, load_outcomes
+    except Exception as err:
+        log.warning(f"[scan_bot] load tracker helpers for risk stats failed: {err}")
+        return {}
+
+    tracked = {str(c) for c in codes if c}
+    if not tracked:
+        return {}
+    dates = list_prediction_dates()
+    recent = dates[-window_days:] if len(dates) >= window_days else dates
+
+    stats = {code: {"severe": 0, "samples": 0} for code in tracked}
+    for d in recent:
+        preds = load_predictions(d) or []
+        outs = load_outcomes(d) or {}
+        if not preds or not outs:
+            continue
+        for p in preds:
+            code = str(p.get("code") or "")
+            if code not in tracked:
+                continue
+            if p.get("scene") not in (None, "", "scan"):
+                continue
+            if p.get("watchlist"):
+                continue
+            if p.get("signal") != "买入":
+                continue
+            out = outs.get(code) or {}
+            dd5 = out.get("max_drawdown_5d")
+            if not isinstance(dd5, (int, float)):
+                continue
+            stats[code]["samples"] += 1
+            stats[code]["severe"] += int(float(dd5) <= float(severe_dd_threshold))
+
+    out = {}
+    for code, s in stats.items():
+        n = int(s.get("samples", 0))
+        if n <= 0:
+            continue
+        severe_rate = float(s.get("severe", 0)) / n
+        out[code] = {"severe_rate": severe_rate, "samples": n}
+    return out
+
+
+def _extract_payoff_quality(row: dict) -> tuple[float | None, float | None, float | None]:
+    """
+    从候选行提取收益/风险质量:
+    - gain_pct: 双周期目标涨幅中的较大值（百分比，如 3.2 表示 +3.2%）
+    - risk_pct: 历史回撤绝对值（百分比）
+    - payoff_ratio: gain_pct / risk_pct
+    任一关键字段缺失时返回 None。
+    """
+    dual = row.get("dual_trade", {}) or {}
+    short_gain = (dual.get("short", {}) or {}).get("gain_pct")
+    long_gain = (dual.get("long", {}) or {}).get("gain_pct")
+    gain_candidates = [
+        float(v) for v in (short_gain, long_gain)
+        if isinstance(v, (int, float))
+    ]
+    if not gain_candidates:
+        return None, None, None
+    gain_pct = max(gain_candidates)
+
+    drawdown = row.get("drawdown")
+    if not isinstance(drawdown, (int, float)):
+        return gain_pct, None, None
+    risk_pct = abs(float(drawdown)) * 100.0
+    if risk_pct <= 0:
+        return gain_pct, 0.0, None
+    return gain_pct, risk_pct, gain_pct / risk_pct
+
+
+def _technical_confirmation_count(row: dict, cfg: dict, mode: str) -> tuple[int, int]:
+    """
+    统计技术共振确认数。
+    返回 (hit_count, available_count)。
+    """
+    last = row.get("last", {}) or {}
+    checks: list[bool] = []
+
+    rsi6 = last.get("rsi6")
+    if isinstance(rsi6, (int, float)):
+        rsi_floor = float(cfg.get("tech_rsi_floor_hard", 53.0) if mode == "hard" else cfg.get("tech_rsi_floor_weak", 50.0))
+        checks.append(float(rsi6) >= rsi_floor)
+
+    macd_hist = last.get("macd_hist")
+    if isinstance(macd_hist, (int, float)):
+        checks.append(float(macd_hist) > 0.0)
+
+    vol_ratio = last.get("vol_ratio")
+    if isinstance(vol_ratio, (int, float)):
+        vol_floor = float(cfg.get("tech_vol_ratio_floor_hard", 1.10) if mode == "hard" else cfg.get("tech_vol_ratio_floor_weak", 1.00))
+        checks.append(float(vol_ratio) >= vol_floor)
+
+    close_p = last.get("close")
+    ma20 = last.get("ma20")
+    if isinstance(close_p, (int, float)) and isinstance(ma20, (int, float)) and float(ma20) > 0:
+        checks.append(float(close_p) >= float(ma20))
+
+    if not checks:
+        return 0, 0
+    return sum(1 for x in checks if x), len(checks)
+
+
+def _trend_alignment_count(row: dict, cfg: dict, mode: str) -> tuple[int, int]:
+    """
+    统计趋势一致性确认数（均线结构 + 收盘位置）。
+    返回 (hit_count, available_count)。
+    """
+    last = row.get("last", {}) or {}
+    checks: list[bool] = []
+
+    ma5 = last.get("ma5")
+    ma10 = last.get("ma10")
+    ma20 = last.get("ma20")
+    ma60 = last.get("ma60")
+    close_p = last.get("close")
+
+    if all(isinstance(v, (int, float)) for v in (ma5, ma10, ma20)):
+        checks.append(float(ma5) >= float(ma10) >= float(ma20))
+    if all(isinstance(v, (int, float)) for v in (ma10, ma20, ma60)):
+        checks.append(float(ma10) >= float(ma20) >= float(ma60))
+    if isinstance(close_p, (int, float)) and isinstance(ma20, (int, float)):
+        checks.append(float(close_p) >= float(ma20))
+    if isinstance(close_p, (int, float)) and isinstance(ma5, (int, float)):
+        close_buffer = float(cfg.get("trend_close_buffer_hard", 0.0) if mode == "hard" else cfg.get("trend_close_buffer_weak", -0.01))
+        checks.append(float(close_p) >= float(ma5) * (1.0 + close_buffer))
+
+    if not checks:
+        return 0, 0
+    return sum(1 for x in checks if x), len(checks)
+
+
+def _load_current_tactic_stats() -> dict:
+    """读取当前市场状态下各战法统计（中文战法名 -> {precision, samples}）。"""
+    import json
+    from pathlib import Path
+    try:
+        from learning.market_state import load_current_state
+        state = load_current_state().get("current", "range")
+        data = json.loads(Path("learning/tactic_params.json").read_text(encoding="utf-8"))
+        params = data.get("params", {}).get(state, {})
+        mapping = {"价值": "value", "成长": "growth", "龙头": "leader", "逆向": "contra"}
+        out = {}
+        for cn, key in mapping.items():
+            item = params.get(key, {})
+            v = item.get("precision")
+            if isinstance(v, (int, float)):
+                out[cn] = {
+                    "precision": float(v),
+                    "samples": int(item.get("samples", 0) or 0),
+                }
+        return out
+    except Exception:
+        return {}
+
+
+def _load_current_tactic_precisions() -> dict:
+    """读取当前市场状态下各战法精准率（中文战法名 -> precision）。"""
+    stats = _load_current_tactic_stats()
+    return {k: float(v.get("precision", 0.0)) for k, v in stats.items()}
+
+
+def _confidence_factor(confidence: str) -> float:
+    c = str(confidence or "").strip().lower()
+    if c in ("高", "high", "h"):
+        return 1.06
+    if c in ("中", "medium", "mid", "m"):
+        return 1.00
+    if c in ("低", "low", "l"):
+        return 0.94
+    return 1.00
+
+
+def _apply_precision_rerank(results: list) -> list:
+    """对推荐候选做精度导向重排（不改 signal/rise_prob）。"""
+    if not results:
+        return results
+    cfg = _load_recommend_scoring_cfg()
+    tactic_prec = _load_current_tactic_precisions()
+
+    w_prob = float(cfg.get("w_prob", 0.62))
+    w_rank = float(cfg.get("w_rank", 0.18))
+    w_mom = float(cfg.get("w_momentum", 0.12))
+    w_res = float(cfg.get("w_resonance", 0.08))
+    w_tactic = float(cfg.get("w_tactic_precision", 0.40))
+    atr_ref = float(cfg.get("atr_ref", 0.06))
+    atr_penalty_scale = float(cfg.get("atr_penalty_scale", 0.70))
+    atr_penalty_cap = float(cfg.get("atr_penalty_cap", 0.10))
+    dd_ref = float(cfg.get("drawdown_ref", -0.35))
+    dd_penalty_scale = float(cfg.get("drawdown_penalty_scale", 0.25))
+    dd_penalty_cap = float(cfg.get("drawdown_penalty_cap", 0.08))
+    momentum_divisor = float(cfg.get("momentum_divisor", 2.0))
+
+    rescored = []
+    for r in results:
+        rise_prob = float(r.get("rise_prob", 0.0) or 0.0)
+        rank_pct = float(r.get("global_rank_pct", 1.0) or 1.0)
+        momentum = float(r.get("momentum", 0.0) or 0.0)
+        resonance = int(r.get("tactic_resonance", 0) or 0)
+        drawdown = float(r.get("drawdown", 0.0) or 0.0)
+        last = r.get("last", {}) or {}
+        close_p = float(last.get("close") or 0.0)
+        atr14 = float(last.get("atr14") or 0.0)
+        atr_pct = (atr14 / close_p) if close_p > 0 and atr14 > 0 else 0.0
+
+        momentum_norm = min(max(momentum / momentum_divisor, 0.0), 1.0)
+        resonance_norm = min(max(resonance, 0), 3) / 3.0
+        base_score = (
+            rise_prob * w_prob
+            + (1.0 - min(max(rank_pct, 0.0), 1.0)) * w_rank
+            + momentum_norm * w_mom
+            + resonance_norm * w_res
+        )
+
+        tactic_bonus = 0.0
+        tags = r.get("tactic_tags", {}) or {}
+        hit_precisions = [tactic_prec.get(t) for t in tags if tags.get(t) and t in tactic_prec]
+        if hit_precisions:
+            avg_prec = sum(hit_precisions) / len(hit_precisions)
+            tactic_bonus = max(-0.05, min(0.08, (avg_prec - 0.50) * w_tactic))
+
+        vol_penalty = 0.0
+        if atr_pct > atr_ref:
+            vol_penalty = min((atr_pct - atr_ref) * atr_penalty_scale, atr_penalty_cap)
+
+        dd_penalty = 0.0
+        if drawdown < dd_ref:
+            dd_penalty = min((abs(drawdown) - abs(dd_ref)) * dd_penalty_scale, dd_penalty_cap)
+
+        conf_factor = _confidence_factor(r.get("confidence", ""))
+        recommend_score = (base_score + tactic_bonus - vol_penalty - dd_penalty) * conf_factor
+
+        rr = dict(r)
+        rr["recommend_score"] = round(float(recommend_score), 6)
+        rescored.append(rr)
+
+    rescored.sort(
+        key=lambda x: (
+            -float(x.get("recommend_score", 0.0)),
+            float(x.get("global_rank_pct", 1.0)),
+            -float(x.get("rise_prob", 0.0)),
+        )
+    )
+    return rescored
+
+
+def _apply_precision_gate(results: list, strategy: dict) -> tuple[list, dict]:
+    """
+    在近期精准率走弱时，对低质量买入候选降级为观望，降低误报。
+    仅影响推荐展示排序，不修改原始涨概率。
+    """
+    if not results:
+        return results, {"enabled": False, "applied": False}
+
+    cfg = _load_recommend_precision_gate_cfg()
+    enabled = bool(cfg.get("enabled", True))
+    context = _load_recent_accuracy_context(strategy)
+    summary = {
+        "enabled": enabled,
+        "applied": False,
+        "mode": "off",
+        "demoted": 0,
+        "buy_before": sum(1 for r in results if r.get("signal") == "买入"),
+        "buy_after": sum(1 for r in results if r.get("signal") == "买入"),
+        "acc_7d": float(context.get("acc_7d", 0.0)),
+        "acc_30d": float(context.get("acc_30d", 0.0)),
+        "samples_7d": int(context.get("samples_7d", 0)),
+        "samples_30d": int(context.get("samples_30d", 0)),
+        "demoted_by_bin": 0,
+        "demoted_by_confidence": 0,
+        "demoted_by_tactic": 0,
+        "demoted_by_symbol": 0,
+        "demoted_by_payoff": 0,
+        "demoted_by_technical": 0,
+        "demoted_by_symbol_risk": 0,
+        "demoted_by_liquidity": 0,
+        "demoted_by_trend": 0,
+        "demoted_by_extension": 0,
+        "demoted_by_volatility": 0,
+        "demoted_by_edge": 0,
+        "demoted_by_dual_target": 0,
+        "demoted_by_atr_reward": 0,
+        "tuning_level": "neutral",
+        "tuning_strength": 0.0,
+    }
+    if not enabled:
+        return results, summary
+
+    min_samples_7d = int(cfg.get("min_samples_7d", 15))
+    min_samples_30d = int(cfg.get("min_samples_30d", 60))
+    if summary["samples_7d"] < min_samples_7d or summary["samples_30d"] < min_samples_30d:
+        return results, summary
+
+    weak_acc_7d = float(cfg.get("weak_acc_7d", 0.54))
+    weak_acc_30d = float(cfg.get("weak_acc_30d", 0.50))
+    hard_acc_30d = float(cfg.get("hard_acc_30d", 0.42))
+    if summary["acc_30d"] < hard_acc_30d:
+        mode = "hard"
+    elif summary["acc_7d"] < weak_acc_7d or summary["acc_30d"] < weak_acc_30d:
+        mode = "weak"
+    else:
+        return results, summary
+    tuning_profile = _resolve_adaptive_tuning_profile(
+        cfg, mode, summary,
+        weak_acc_7d=weak_acc_7d,
+        weak_acc_30d=weak_acc_30d,
+        hard_acc_30d=hard_acc_30d,
+    )
+    summary["tuning_level"] = tuning_profile.get("level", "neutral")
+    summary["tuning_strength"] = float(tuning_profile.get("strength", 0.0) or 0.0)
+
+    if mode == "hard":
+        min_score = float(cfg.get("min_recommend_score_hard", 0.48))
+        min_prob = float(cfg.get("min_rise_prob_hard", 0.60))
+        min_resonance = int(cfg.get("min_resonance_hard", 2))
+    else:
+        min_score = float(cfg.get("min_recommend_score_weak", 0.44))
+        min_prob = float(cfg.get("min_rise_prob_weak", 0.57))
+        min_resonance = int(cfg.get("min_resonance_weak", 1))
+
+    protect_top_buy = int(
+        cfg.get("protect_top_buy_hard", cfg.get("protect_top_buy", 2)) if mode == "hard"
+        else cfg.get("protect_top_buy_weak", cfg.get("protect_top_buy", 3))
+    )
+    max_demote_ratio = float(
+        cfg.get("max_demote_ratio_hard", cfg.get("max_demote_ratio", 0.65)) if mode == "hard"
+        else cfg.get("max_demote_ratio_weak", cfg.get("max_demote_ratio", 0.50))
+    )
+    max_demote_ratio = max(0.0, min(max_demote_ratio, 1.0))
+    use_prob_bin_guard = bool(cfg.get("use_prob_bin_guard", True))
+    prob_bin_min_samples = int(cfg.get("prob_bin_min_samples", 12))
+    prob_bin_min_hit_rate = float(
+        cfg.get("prob_bin_min_hit_rate_hard", 0.52) if mode == "hard"
+        else cfg.get("prob_bin_min_hit_rate_weak", 0.48)
+    )
+    prob_bin_stats = _load_prob_bin_precision_stats() if use_prob_bin_guard else {}
+    use_confidence_guard = bool(cfg.get("use_confidence_guard", True))
+    confidence_min_samples = int(cfg.get("confidence_min_samples", 12))
+    confidence_thresholds = _confidence_threshold_map(cfg, mode)
+    confidence_stats = _load_confidence_precision_stats() if use_confidence_guard else {}
+    use_tactic_guard = bool(cfg.get("use_tactic_guard", True))
+    tactic_min_samples = int(cfg.get("tactic_min_samples", 30))
+    tactic_min_precision = float(
+        cfg.get("tactic_min_precision_hard", 0.54) if mode == "hard"
+        else cfg.get("tactic_min_precision_weak", 0.50)
+    )
+    tactic_stats = _load_current_tactic_stats() if use_tactic_guard else {}
+    use_symbol_memory_guard = bool(cfg.get("use_symbol_memory_guard", True))
+    symbol_memory_window_days = int(cfg.get("symbol_memory_window_days", 30))
+    symbol_memory_min_samples = int(cfg.get("symbol_memory_min_samples", 3))
+    symbol_memory_min_hit_rate = float(
+        cfg.get("symbol_memory_min_hit_rate_hard", 0.45) if mode == "hard"
+        else cfg.get("symbol_memory_min_hit_rate_weak", 0.40)
+    )
+    symbol_stats = {}
+    if use_symbol_memory_guard:
+        symbol_stats = _load_recent_symbol_buy_stats(
+            [str(r.get("code") or "") for r in results], strategy, window_days=symbol_memory_window_days
+        )
+    use_symbol_risk_guard = bool(cfg.get("use_symbol_risk_guard", True))
+    symbol_risk_window_days = int(cfg.get("symbol_risk_window_days", 45))
+    symbol_risk_min_samples = int(cfg.get("symbol_risk_min_samples", 3))
+    symbol_risk_dd_threshold = float(cfg.get("symbol_risk_dd_threshold", -0.10))
+    symbol_risk_max_rate = float(
+        cfg.get("symbol_risk_max_rate_hard", 0.45) if mode == "hard"
+        else cfg.get("symbol_risk_max_rate_weak", 0.55)
+    )
+    symbol_risk_stats = {}
+    if use_symbol_risk_guard:
+        symbol_risk_stats = _load_recent_symbol_risk_stats(
+            [str(r.get("code") or "") for r in results],
+            window_days=symbol_risk_window_days,
+            severe_dd_threshold=symbol_risk_dd_threshold,
+        )
+    use_payoff_guard = bool(cfg.get("use_payoff_guard", True))
+    payoff_min_gain = float(
+        cfg.get("payoff_min_gain_hard", 2.5) if mode == "hard"
+        else cfg.get("payoff_min_gain_weak", 2.0)
+    )
+    payoff_min_ratio = float(
+        cfg.get("payoff_min_ratio_hard", 0.60) if mode == "hard"
+        else cfg.get("payoff_min_ratio_weak", 0.45)
+    )
+    payoff_min_risk_pct = float(cfg.get("payoff_min_risk_pct", 6.0))
+    use_technical_guard = bool(cfg.get("use_technical_guard", True))
+    tech_min_confirmations = int(
+        cfg.get("tech_min_confirmations_hard", 3) if mode == "hard"
+        else cfg.get("tech_min_confirmations_weak", 2)
+    )
+    tech_min_available = int(cfg.get("tech_min_available_checks", 3))
+    use_liquidity_guard = bool(cfg.get("use_liquidity_guard", True))
+    liquidity_min_turnover = float(
+        cfg.get("liquidity_min_turnover_hard", 1.8) if mode == "hard"
+        else cfg.get("liquidity_min_turnover_weak", 1.0)
+    )
+    liquidity_max_turnover = float(
+        cfg.get("liquidity_max_turnover_hard", 20.0) if mode == "hard"
+        else cfg.get("liquidity_max_turnover_weak", 25.0)
+    )
+    liquidity_min_vol_ratio = float(
+        cfg.get("liquidity_min_vol_ratio_hard", 1.0) if mode == "hard"
+        else cfg.get("liquidity_min_vol_ratio_weak", 0.9)
+    )
+    use_trend_guard = bool(cfg.get("use_trend_guard", True))
+    trend_min_hits = int(
+        cfg.get("trend_min_hits_hard", 3) if mode == "hard"
+        else cfg.get("trend_min_hits_weak", 2)
+    )
+    trend_min_available = int(cfg.get("trend_min_available_checks", 3))
+    use_extension_guard = bool(cfg.get("use_extension_guard", True))
+    max_close_ma20_dev = float(
+        cfg.get("max_close_ma20_dev_hard", 0.08) if mode == "hard"
+        else cfg.get("max_close_ma20_dev_weak", 0.12)
+    )
+    use_volatility_guard = bool(cfg.get("use_volatility_guard", True))
+    atr_pct_max = float(
+        cfg.get("atr_pct_max_hard", 0.07) if mode == "hard"
+        else cfg.get("atr_pct_max_weak", 0.10)
+    )
+    use_edge_guard = bool(cfg.get("use_edge_guard", True))
+    edge_min_prob = float(
+        cfg.get("edge_min_prob_hard", 0.015) if mode == "hard"
+        else cfg.get("edge_min_prob_weak", 0.008)
+    )
+    last_thresh_buy = strategy.get("last_thresh_buy")
+    has_last_thresh_buy = isinstance(last_thresh_buy, (int, float))
+    use_dual_target_guard = bool(cfg.get("use_dual_target_guard", True))
+    dual_min_short_gain = float(
+        cfg.get("dual_min_short_gain_hard", 2.0) if mode == "hard"
+        else cfg.get("dual_min_short_gain_weak", 1.5)
+    )
+    dual_min_long_gain = float(
+        cfg.get("dual_min_long_gain_hard", 3.0) if mode == "hard"
+        else cfg.get("dual_min_long_gain_weak", 2.2)
+    )
+    dual_min_long_short_ratio = float(
+        cfg.get("dual_min_long_short_ratio_hard", 0.90) if mode == "hard"
+        else cfg.get("dual_min_long_short_ratio_weak", 0.75)
+    )
+    use_atr_reward_guard = bool(cfg.get("use_atr_reward_guard", True))
+    min_gain_atr_ratio = float(
+        cfg.get("min_gain_atr_ratio_hard", 1.25) if mode == "hard"
+        else cfg.get("min_gain_atr_ratio_weak", 1.00)
+    )
+    min_factor = max(0.5, float(tuning_profile.get("min_factor", 1.0)))
+    max_factor = max(0.5, float(tuning_profile.get("max_factor", 1.0)))
+    count_delta = int(tuning_profile.get("count_delta", 0))
+    demote_ratio_factor = max(0.1, float(tuning_profile.get("demote_ratio_factor", 1.0)))
+
+    min_score *= min_factor
+    min_prob *= min_factor
+    min_resonance = max(0, min_resonance + count_delta)
+    max_demote_ratio = max(0.0, min(max_demote_ratio * demote_ratio_factor, 1.0))
+    prob_bin_min_hit_rate = max(0.0, min(prob_bin_min_hit_rate * min_factor, 1.0))
+    confidence_thresholds = {k: max(0.0, min(float(v) * min_factor, 1.0)) for k, v in confidence_thresholds.items()}
+    tactic_min_precision = max(0.0, min(tactic_min_precision * min_factor, 1.0))
+    symbol_memory_min_hit_rate = max(0.0, min(symbol_memory_min_hit_rate * min_factor, 1.0))
+    symbol_risk_max_rate = max(0.0, min(symbol_risk_max_rate * max_factor, 1.0))
+    payoff_min_gain = max(0.0, payoff_min_gain * min_factor)
+    payoff_min_ratio = max(0.0, payoff_min_ratio * min_factor)
+    tech_min_confirmations = max(1, tech_min_confirmations + count_delta)
+    liquidity_min_turnover = max(0.0, liquidity_min_turnover * min_factor)
+    liquidity_max_turnover = max(liquidity_min_turnover, liquidity_max_turnover * max_factor)
+    liquidity_min_vol_ratio = max(0.0, liquidity_min_vol_ratio * min_factor)
+    trend_min_hits = max(1, trend_min_hits + count_delta)
+    max_close_ma20_dev = max(0.0, max_close_ma20_dev * max_factor)
+    atr_pct_max = max(0.0, atr_pct_max * max_factor)
+    edge_min_prob = max(0.0, edge_min_prob * min_factor)
+    dual_min_short_gain = max(0.0, dual_min_short_gain * min_factor)
+    dual_min_long_gain = max(0.0, dual_min_long_gain * min_factor)
+    dual_min_long_short_ratio = max(0.0, dual_min_long_short_ratio * min_factor)
+    min_gain_atr_ratio = max(0.0, min_gain_atr_ratio * min_factor)
+
+    buy_indexes = [i for i, r in enumerate(results) if r.get("signal") == "买入"]
+    max_demote = int(len(buy_indexes) * max_demote_ratio)
+    if max_demote <= 0:
+        return results, summary
+
+    gated = list(results)
+    demoted = 0
+    for buy_rank, idx in enumerate(buy_indexes):
+        if buy_rank < protect_top_buy:
+            continue
+        if demoted >= max_demote:
+            break
+
+        row = gated[idx]
+        score = float(row.get("recommend_score", 0.0) or 0.0)
+        prob = float(row.get("rise_prob", 0.0) or 0.0)
+        resonance = int(row.get("tactic_resonance", 0) or 0)
+        failed = []
+        bin_demoted = False
+        confidence_demoted = False
+        tactic_demoted = False
+        symbol_demoted = False
+        payoff_demoted = False
+        technical_demoted = False
+        symbol_risk_demoted = False
+        liquidity_demoted = False
+        trend_demoted = False
+        extension_demoted = False
+        volatility_demoted = False
+        edge_demoted = False
+        dual_target_demoted = False
+        atr_reward_demoted = False
+        if score < min_score:
+            failed.append(f"score<{min_score:.2f}")
+        if prob < min_prob:
+            failed.append(f"prob<{min_prob:.2f}")
+        if resonance < min_resonance:
+            failed.append(f"res<{min_resonance}")
+        if prob_bin_stats:
+            label = _prob_bin_label(prob)
+            info = prob_bin_stats.get(label, {})
+            b_samples = int(info.get("samples", 0) or 0)
+            b_rate = float(info.get("hit_rate", 0.0) or 0.0)
+            if b_samples >= prob_bin_min_samples and b_rate < prob_bin_min_hit_rate:
+                failed.append(f"bin<{prob_bin_min_hit_rate:.2f}")
+                bin_demoted = True
+        if confidence_stats:
+            conf_label = _normalize_confidence_label(row.get("confidence", "中"))
+            info = confidence_stats.get(conf_label, {})
+            c_samples = int(info.get("samples", 0) or 0)
+            c_rate = float(info.get("hit_rate", 0.0) or 0.0)
+            c_threshold = float(confidence_thresholds.get(conf_label, 0.0))
+            if c_samples >= confidence_min_samples and c_rate < c_threshold:
+                failed.append(f"conf<{c_threshold:.2f}")
+                confidence_demoted = True
+        if tactic_stats:
+            tags = row.get("tactic_tags", {}) or {}
+            matched = []
+            for name, hit in tags.items():
+                if not hit:
+                    continue
+                st = tactic_stats.get(name)
+                if not st:
+                    continue
+                samples = int(st.get("samples", 0) or 0)
+                if samples >= tactic_min_samples:
+                    matched.append(float(st.get("precision", 0.0) or 0.0))
+            if matched:
+                avg_tactic_prec = sum(matched) / len(matched)
+                if avg_tactic_prec < tactic_min_precision:
+                    failed.append(f"tactic<{tactic_min_precision:.2f}")
+                    tactic_demoted = True
+        if symbol_stats:
+            code = str(row.get("code") or "")
+            st = symbol_stats.get(code, {})
+            s_samples = int(st.get("samples", 0) or 0)
+            s_rate = float(st.get("hit_rate", 0.0) or 0.0)
+            if s_samples >= symbol_memory_min_samples and s_rate < symbol_memory_min_hit_rate:
+                failed.append(f"symbol<{symbol_memory_min_hit_rate:.2f}")
+                symbol_demoted = True
+        if use_payoff_guard:
+            gain_pct, risk_pct, payoff_ratio = _extract_payoff_quality(row)
+            if gain_pct is not None:
+                if gain_pct < payoff_min_gain:
+                    failed.append(f"gain<{payoff_min_gain:.1f}%")
+                    payoff_demoted = True
+                elif (
+                    isinstance(risk_pct, (int, float))
+                    and risk_pct >= payoff_min_risk_pct
+                    and isinstance(payoff_ratio, (int, float))
+                    and payoff_ratio < payoff_min_ratio
+                ):
+                    failed.append(f"payoff<{payoff_min_ratio:.2f}")
+                    payoff_demoted = True
+        if use_technical_guard:
+            hit_cnt, avail_cnt = _technical_confirmation_count(row, cfg, mode)
+            if avail_cnt >= tech_min_available and hit_cnt < tech_min_confirmations:
+                failed.append(f"tech<{tech_min_confirmations}/{avail_cnt}")
+                technical_demoted = True
+        if symbol_risk_stats:
+            code = str(row.get("code") or "")
+            rst = symbol_risk_stats.get(code, {})
+            r_samples = int(rst.get("samples", 0) or 0)
+            severe_rate = float(rst.get("severe_rate", 0.0) or 0.0)
+            if r_samples >= symbol_risk_min_samples and severe_rate > symbol_risk_max_rate:
+                failed.append(f"risk>{symbol_risk_max_rate:.2f}")
+                symbol_risk_demoted = True
+        if use_liquidity_guard:
+            last = row.get("last", {}) or {}
+            turnover = last.get("turnover")
+            vol_ratio = last.get("vol_ratio")
+            if isinstance(turnover, (int, float)):
+                to = float(turnover)
+                if to < liquidity_min_turnover:
+                    failed.append(f"turnover<{liquidity_min_turnover:.1f}")
+                    liquidity_demoted = True
+                elif to > liquidity_max_turnover:
+                    failed.append(f"turnover>{liquidity_max_turnover:.1f}")
+                    liquidity_demoted = True
+            if isinstance(vol_ratio, (int, float)) and float(vol_ratio) < liquidity_min_vol_ratio:
+                failed.append(f"vol<{liquidity_min_vol_ratio:.2f}")
+                liquidity_demoted = True
+        if use_trend_guard:
+            trend_hits, trend_available = _trend_alignment_count(row, cfg, mode)
+            if trend_available >= trend_min_available and trend_hits < trend_min_hits:
+                failed.append(f"trend<{trend_min_hits}/{trend_available}")
+                trend_demoted = True
+        if use_extension_guard:
+            last = row.get("last", {}) or {}
+            close_p = last.get("close")
+            ma20 = last.get("ma20")
+            if isinstance(close_p, (int, float)) and isinstance(ma20, (int, float)) and float(ma20) > 0:
+                ext = float(close_p) / float(ma20) - 1.0
+                if ext > max_close_ma20_dev:
+                    failed.append(f"ext>{max_close_ma20_dev:.2f}")
+                    extension_demoted = True
+        if use_volatility_guard:
+            last = row.get("last", {}) or {}
+            close_p = last.get("close")
+            atr14 = last.get("atr14")
+            if isinstance(close_p, (int, float)) and isinstance(atr14, (int, float)) and float(close_p) > 0:
+                atr_pct = float(atr14) / float(close_p)
+                if atr_pct > atr_pct_max:
+                    failed.append(f"atr>{atr_pct_max:.2f}")
+                    volatility_demoted = True
+        if use_edge_guard and has_last_thresh_buy:
+            edge = float(prob) - float(last_thresh_buy)
+            if edge < edge_min_prob:
+                failed.append(f"edge<{edge_min_prob:.3f}")
+                edge_demoted = True
+        if use_dual_target_guard:
+            dual = row.get("dual_trade", {}) or {}
+            sg = (dual.get("short", {}) or {}).get("gain_pct")
+            lg = (dual.get("long", {}) or {}).get("gain_pct")
+            if isinstance(sg, (int, float)) and isinstance(lg, (int, float)):
+                short_gain = float(sg)
+                long_gain = float(lg)
+                if short_gain < dual_min_short_gain:
+                    failed.append(f"s_gain<{dual_min_short_gain:.1f}%")
+                    dual_target_demoted = True
+                if long_gain < dual_min_long_gain:
+                    failed.append(f"l_gain<{dual_min_long_gain:.1f}%")
+                    dual_target_demoted = True
+                if short_gain > 0 and (long_gain / short_gain) < dual_min_long_short_ratio:
+                    failed.append(f"l/s<{dual_min_long_short_ratio:.2f}")
+                    dual_target_demoted = True
+        if use_atr_reward_guard:
+            last = row.get("last", {}) or {}
+            close_p = last.get("close")
+            atr14 = last.get("atr14")
+            dual = row.get("dual_trade", {}) or {}
+            sg = (dual.get("short", {}) or {}).get("gain_pct")
+            lg = (dual.get("long", {}) or {}).get("gain_pct")
+            gains = [float(x) for x in (sg, lg) if isinstance(x, (int, float))]
+            if isinstance(close_p, (int, float)) and isinstance(atr14, (int, float)) and float(close_p) > 0 and gains:
+                atr_pct = (float(atr14) / float(close_p)) * 100.0
+                if atr_pct > 0:
+                    gain_atr_ratio = max(gains) / atr_pct
+                    if gain_atr_ratio < min_gain_atr_ratio:
+                        failed.append(f"g/atr<{min_gain_atr_ratio:.2f}")
+                        atr_reward_demoted = True
+        if not failed:
+            continue
+
+        rr = dict(row)
+        rr["signal"] = "观望"
+        rr["precision_gate_mode"] = mode
+        rr["precision_gate_reason"] = ",".join(failed)
+        gated[idx] = rr
+        demoted += 1
+        if bin_demoted:
+            summary["demoted_by_bin"] += 1
+        if confidence_demoted:
+            summary["demoted_by_confidence"] += 1
+        if tactic_demoted:
+            summary["demoted_by_tactic"] += 1
+        if symbol_demoted:
+            summary["demoted_by_symbol"] += 1
+        if payoff_demoted:
+            summary["demoted_by_payoff"] += 1
+        if technical_demoted:
+            summary["demoted_by_technical"] += 1
+        if symbol_risk_demoted:
+            summary["demoted_by_symbol_risk"] += 1
+        if liquidity_demoted:
+            summary["demoted_by_liquidity"] += 1
+        if trend_demoted:
+            summary["demoted_by_trend"] += 1
+        if extension_demoted:
+            summary["demoted_by_extension"] += 1
+        if volatility_demoted:
+            summary["demoted_by_volatility"] += 1
+        if edge_demoted:
+            summary["demoted_by_edge"] += 1
+        if dual_target_demoted:
+            summary["demoted_by_dual_target"] += 1
+        if atr_reward_demoted:
+            summary["demoted_by_atr_reward"] += 1
+
+    summary["applied"] = demoted > 0
+    summary["mode"] = mode
+    summary["demoted"] = demoted
+    summary["buy_after"] = summary["buy_before"] - demoted
+    return gated, summary
+
+
+def _precision_gate_line(summary: dict) -> str:
+    if not isinstance(summary, dict) or not summary.get("applied"):
+        return ""
+    buy_before = int(summary.get("buy_before", 0) or 0)
+    buy_after = int(summary.get("buy_after", 0) or 0)
+    demoted = int(summary.get("demoted", 0) or 0)
+    demote_rate = (demoted / buy_before) if buy_before > 0 else 0.0
+    contrib = [
+        ("分桶", int(summary.get("demoted_by_bin", 0) or 0)),
+        ("置信度", int(summary.get("demoted_by_confidence", 0) or 0)),
+        ("战法", int(summary.get("demoted_by_tactic", 0) or 0)),
+        ("个股记忆", int(summary.get("demoted_by_symbol", 0) or 0)),
+        ("收益风险", int(summary.get("demoted_by_payoff", 0) or 0)),
+        ("技术共振", int(summary.get("demoted_by_technical", 0) or 0)),
+        ("回撤风险", int(summary.get("demoted_by_symbol_risk", 0) or 0)),
+        ("流动性", int(summary.get("demoted_by_liquidity", 0) or 0)),
+        ("趋势一致", int(summary.get("demoted_by_trend", 0) or 0)),
+        ("过热偏离", int(summary.get("demoted_by_extension", 0) or 0)),
+        ("极端波动", int(summary.get("demoted_by_volatility", 0) or 0)),
+        ("概率边际", int(summary.get("demoted_by_edge", 0) or 0)),
+        ("双周期目标", int(summary.get("demoted_by_dual_target", 0) or 0)),
+        ("ATR收益比", int(summary.get("demoted_by_atr_reward", 0) or 0)),
+    ]
+    top_contrib = [x for x in contrib if x[1] > 0]
+    top_contrib.sort(key=lambda x: x[1], reverse=True)
+    top_str = "、".join(f"{k}×{v}" for k, v in top_contrib[:3]) if top_contrib else "无"
+    return (
+        f"🎯 提精闸门：{summary.get('mode')} 模式（调优 {summary.get('tuning_level', 'neutral')},"
+        f" 强度 {float(summary.get('tuning_strength', 0.0)):.0%}），"
+        f"7日 **{float(summary.get('acc_7d', 0.0)):.1%}** / "
+        f"30日 **{float(summary.get('acc_30d', 0.0)):.1%}**，"
+        f"降级 **{demoted}** 只低质买入候选"
+        f"（{buy_before}→{buy_after}，降级率 **{demote_rate:.0%}**）"
+        f"；主要来源：{top_str}"
+        f"（分桶 **{int(summary.get('demoted_by_bin', 0))}** / "
+        f"置信度 **{int(summary.get('demoted_by_confidence', 0))}** / "
+        f"战法 **{int(summary.get('demoted_by_tactic', 0))}** / "
+        f"个股记忆 **{int(summary.get('demoted_by_symbol', 0))}** / "
+        f"收益风险 **{int(summary.get('demoted_by_payoff', 0))}** / "
+        f"技术共振 **{int(summary.get('demoted_by_technical', 0))}** / "
+        f"回撤风险 **{int(summary.get('demoted_by_symbol_risk', 0))}** / "
+        f"流动性 **{int(summary.get('demoted_by_liquidity', 0))}** / "
+        f"趋势一致 **{int(summary.get('demoted_by_trend', 0))}** / "
+        f"过热偏离 **{int(summary.get('demoted_by_extension', 0))}** / "
+        f"极端波动 **{int(summary.get('demoted_by_volatility', 0))}** / "
+        f"概率边际 **{int(summary.get('demoted_by_edge', 0))}** / "
+        f"双周期目标 **{int(summary.get('demoted_by_dual_target', 0))}** / "
+        f"ATR收益比 **{int(summary.get('demoted_by_atr_reward', 0))}**）"
+    )
+
+
 # ── P2 ai_reason 集成辅助 ────────────────────────────────
 
 def _build_ai_reason_text(r: dict, news_items: list, total: int, sector: str) -> str:
@@ -1061,6 +2080,57 @@ def _scan_ack_card(title: str, color: str, desc: str, steps: list, eta: str) -> 
             f"结果将推送到本会话，预计 **{eta}**。"
         )}],
     }
+
+
+def _strategy_guardrail_snapshot(strategy: dict, current_state: str) -> dict:
+    """从 strategy 中提取当前状态风险护栏快照，缺省时返回保守默认值。"""
+    risk_guards = strategy.get("risk_guardrails", {}) if isinstance(strategy, dict) else {}
+    bounds_all = risk_guards.get("by_state_bounds", {}) if isinstance(risk_guards, dict) else {}
+    bounds = bounds_all.get(current_state) or bounds_all.get("range") or {"min": 0.08, "max": 0.25}
+    min_pct = float(bounds.get("min", 0.08))
+    max_pct = float(bounds.get("max", 0.25))
+
+    cap_cfg = risk_guards.get("low_accuracy_cap", {}) if isinstance(risk_guards, dict) else {}
+    cap_threshold = float(cap_cfg.get("acc_30d_threshold", 0.40))
+    cap_max_pct = float(cap_cfg.get("max_buy_top_pct", 0.12))
+    acc_30d = strategy.get("accuracy_30d")
+    cap_triggered = isinstance(acc_30d, (int, float)) and float(acc_30d) < cap_threshold
+    if cap_triggered:
+        max_pct = min(max_pct, cap_max_pct)
+
+    positioning = strategy.get("positioning", {}) if isinstance(strategy, dict) else {}
+    position_pct = float(positioning.get(current_state, positioning.get("range", 0.6)))
+
+    min_pct = max(0.01, min(min_pct, 0.50))
+    max_pct = max(min_pct, min(max_pct, 0.50))
+    position_pct = max(0.0, min(position_pct, 1.0))
+
+    return {
+        "min_pct": min_pct,
+        "max_pct": max_pct,
+        "position_pct": position_pct,
+        "cap_triggered": cap_triggered,
+        "cap_threshold": cap_threshold,
+        "cap_max_pct": cap_max_pct,
+        "acc_30d": acc_30d,
+    }
+
+
+def _strategy_guardrail_line(strategy: dict, *, current_state: str, buy_top_pct: float) -> str:
+    """构建推荐卡片中的风险护栏提示文案。"""
+    snap = _strategy_guardrail_snapshot(strategy, current_state)
+    line = (
+        f"🛡 护栏：门槛前 **{buy_top_pct:.0%}**（{current_state} 区间 **{snap['min_pct']:.0%}~{snap['max_pct']:.0%}**）"
+        f"　建议仓位 **{snap['position_pct']:.0%}**"
+    )
+    if snap["cap_triggered"]:
+        line += (
+            f"\n↳ 30日精准率 **{float(snap['acc_30d']):.1%}** < **{snap['cap_threshold']:.0%}**，"
+            f"上限收敛到 **{snap['cap_max_pct']:.0%}**"
+        )
+    if buy_top_pct < snap["min_pct"] or buy_top_pct > snap["max_pct"]:
+        line += "\n↳ 当前门槛已偏离护栏区间，建议回到区间内执行。"
+    return line
 
 
 def cmd_scan_bot(top_n: int = 5) -> dict:
@@ -1280,6 +2350,8 @@ def _cmd_scan_bot_impl(top_n: int = 5) -> dict:
     # P2 D3:共振股调 rank_pct,重排 top 让共振股前移
     _apply_resonance_boost(top)
     top.sort(key=lambda r: float(r.get("global_rank_pct", 1.0)))
+    top = _apply_precision_rerank(top)
+    top, gate_summary = _apply_precision_gate(top, strategy)
 
     # 按战法层次过滤：tier1(共振≥2) 在前，tier2(单战法=1) 在后，0 战法不展示
     tier1_all, tier2_all = _tier_split(top)
@@ -1312,6 +2384,10 @@ def _cmd_scan_bot_impl(top_n: int = 5) -> dict:
         _current_state = _lcs().get("current", "range")
     except Exception:
         _current_state = "range"
+    _guardrail_line = _strategy_guardrail_line(
+        strategy, current_state=_current_state, buy_top_pct=float(buy_top_pct)
+    )
+    _gate_line = _precision_gate_line(gate_summary)
 
     snapshot = []
     for r in top:
@@ -1323,6 +2399,7 @@ def _cmd_scan_bot_impl(top_n: int = 5) -> dict:
             "confidence":      r.get("confidence", ""),
             "global_rank":     r.get("global_rank", 0),
             "global_rank_pct": r.get("global_rank_pct", 1.0),
+            "recommend_score": r.get("recommend_score"),
             "scan_total":      _n_total,
             "recommended":     True,   # 进入过 Top-N 推荐列表
             "scan_date":       scan_date,
@@ -1351,6 +2428,7 @@ def _cmd_scan_bot_impl(top_n: int = 5) -> dict:
                     "confidence":      r.get("confidence", ""),
                     "global_rank":     r.get("global_rank", 0),
                     "global_rank_pct": r.get("global_rank_pct", 1.0),
+                    "recommend_score": r.get("recommend_score"),
                     "scan_total":      _n_total,
                     "recommended":     False,
                     "scan_date":       scan_date,
@@ -1381,7 +2459,9 @@ def _cmd_scan_bot_impl(top_n: int = 5) -> dict:
             f"共扫描 **{total}** 只，AI 买入信号 **{n_buy}** 只。\n"
             + (f"今日无买入信号，以下为战法认可的观望标的，供候选参考。\n" if tier_watch
                else f"今日暂无战法认可的推荐股票，建议观望。\n")
-            + f"市场状态 **{_current_state}**{_active_cnt_str}"
+            + f"市场状态 **{_current_state}**{_active_cnt_str}\n"
+            + _guardrail_line
+            + (f"\n{_gate_line}" if _gate_line else "")
         )}]
         if tier_watch:
             watch_lines = [
@@ -1424,7 +2504,9 @@ def _cmd_scan_bot_impl(top_n: int = 5) -> dict:
         "content": (
             f"共扫描 **{total}** 只，AI 买入信号 **{n_buy}** 只。\n"
             f"战法筛选后推荐 **{len(top)}** 只（★共振 {len(tier1)} / ★单战法 {len(tier2)}）\n"
-            f"市场状态 **{_current_state}**{_active_cnt_str}"
+            f"市场状态 **{_current_state}**{_active_cnt_str}\n"
+            f"{_guardrail_line}"
+            + (f"\n{_gate_line}" if _gate_line else "")
         )
     })
     elements.append({"tag": "hr"})
@@ -1726,7 +2808,10 @@ def cmd_strategy() -> dict:
     """
     策略：查看当前选股策略依据、精准率追踪、信号评判标准、特征说明。
     """
-    from learning.optimizer import load_strategy, rolling_accuracy, TARGET_ACCURACY, RISE_THRESHOLD
+    from learning.optimizer import (
+        load_strategy, rolling_accuracy, summarize_guardrail_history,
+        build_monitor_dashboard_metrics, TARGET_ACCURACY, RISE_THRESHOLD
+    )
     from learning.tracker import list_prediction_dates
 
     strategy    = load_strategy()
@@ -1735,6 +2820,9 @@ def cmd_strategy() -> dict:
     acc_30d     = strategy.get("accuracy_30d")
     last_upd    = strategy.get("last_updated", "")
     history     = strategy.get("history", [])
+    guardrail_summary = summarize_guardrail_history(history, 30)
+    risk_guards = strategy.get("risk_guardrails", {})
+    pos_cfg     = strategy.get("positioning", {})
 
     # 实时重算精准率（保证最新）
     try:
@@ -1772,7 +2860,80 @@ def cmd_strategy() -> dict:
             change = h.get("change", "")
             # 取变化说明前20字作摘要
             note   = f"　{change[:20]}" if change else ""
-            status_lines.append(f"· {d}　门槛 {pct:.0%}　精准率 {a7:.1%}{note}")
+            trigger = " 🛡" if h.get("guardrail_triggered") else ""
+            status_lines.append(f"· {d}　门槛 {pct:.0%}　精准率 {a7:.1%}{note}{trigger}")
+
+    guardrail_events = [h for h in history if h.get("guardrail_triggered")]
+    if guardrail_events:
+        status_lines.append("")
+        status_lines.append("**近期护栏触发**")
+        for h in guardrail_events[-3:]:
+            d = h.get("date", "")
+            reason_text = h.get("guardrail_reason_text", "") or "无"
+            status_lines.append(f"· {d}　{reason_text}")
+    if guardrail_summary.get("total_days", 0) > 0:
+        top_items = guardrail_summary.get("top_reasons") or []
+        top_str = "、".join(f"{x['label']}×{x['count']}" for x in top_items[:3]) if top_items else "无"
+        status_lines.append("")
+        status_lines.append(
+            f"**30日护栏统计**：触发 **{guardrail_summary['trigger_days']} / {guardrail_summary['total_days']}**"
+            f"（{guardrail_summary['trigger_rate']:.0%}）"
+        )
+        status_lines.append(f"主要原因：{top_str}")
+
+    metrics = {}
+    try:
+        metrics = build_monitor_dashboard_metrics()
+    except Exception:
+        metrics = {}
+    windows = metrics.get("windows", {}) if isinstance(metrics, dict) else {}
+    w7 = windows.get("7d", {}) if isinstance(windows, dict) else {}
+    w30 = windows.get("30d", {}) if isinstance(windows, dict) else {}
+    alerts = metrics.get("alerts", []) if isinstance(metrics, dict) else []
+    if w7 and w30:
+        status_lines.append("")
+        status_lines.append("**7天/30天监控看板（核心）**")
+        status_lines.append(
+            f"7天：命中率 **{float(w7.get('hit_rate', 0)):.1%}**（{int(w7.get('samples', 0))} 样本）"
+            f"｜均笔收益 **{float(w7.get('avg_return', 0)):.2%}**｜最大回撤 **{float(w7.get('max_drawdown', 0)):.2%}**"
+        )
+        status_lines.append(
+            f"30天：命中率 **{float(w30.get('hit_rate', 0)):.1%}**（{int(w30.get('samples', 0))} 样本）"
+            f"｜均笔收益 **{float(w30.get('avg_return', 0)):.2%}**｜最大回撤 **{float(w30.get('max_drawdown', 0)):.2%}**"
+        )
+        t7_hr = float((w7.get("topn_hit_rate") or {}).get("top5", 0))
+        t7_n = int((w7.get("topn_samples") or {}).get("top5", 0))
+        t30_hr = float((w30.get("topn_hit_rate") or {}).get("top5", 0))
+        t30_n = int((w30.get("topn_samples") or {}).get("top5", 0))
+        status_lines.append(
+            f"Top5命中率：7天 **{t7_hr:.1%}**（{t7_n}）｜30天 **{t30_hr:.1%}**（{t30_n}）"
+        )
+    if alerts:
+        alert_lines = [a.get("message", "") for a in alerts[:3] if isinstance(a, dict) and a.get("message")]
+        if alert_lines:
+            status_lines.append("")
+            status_lines.append("**提精风险告警**")
+            for line in alert_lines:
+                status_lines.append(f"⚠️ {line}")
+
+    # 风险护栏 + 仓位建议
+    try:
+        from learning.market_state import load_current_state
+        cur_state = load_current_state().get("current", "range")
+    except Exception:
+        cur_state = "range"
+    state_bounds = (risk_guards.get("by_state_bounds", {}) or {}).get(cur_state, {})
+    if state_bounds:
+        status_lines.append("")
+        status_lines.append(
+            f"🛡 风险护栏：{cur_state} 市场门槛范围 **{state_bounds.get('min', 0):.0%} ~ {state_bounds.get('max', 0):.0%}**"
+        )
+    if pos_cfg:
+        status_lines.append(
+            f"📦 仓位建议：bull **{float(pos_cfg.get('bull', 1.0)):.0%}** / "
+            f"range **{float(pos_cfg.get('range', 0.6)):.0%}** / "
+            f"bear **{float(pos_cfg.get('bear', 0.3)):.0%}**"
+        )
 
     # ── signal section ─────────────────────────────────────
     watch_top_pct = min(buy_top_pct * 3, 0.40)
@@ -1811,17 +2972,21 @@ def cmd_strategy() -> dict:
     # ── 自适应调整规则（代码块格式）─────────────────────────
     adaptive_block = (
         "```\n"
-        f"精准率 < 75%  →  门槛 -2%   收严，减少误报\n"
-        f"精准率 < 85%  →  门槛 -1%   小幅收严\n"
-        f"精准率 > 93%  →  门槛 +2%   放宽，挖掘更多机会\n"
-        f"精准率 > 85%  →  门槛 +1%   微幅放宽\n"
+        f"精准率 < {TARGET_ACCURACY-0.20:.0%}  →  门槛 -1%   收严，减少误报\n"
+        f"精准率 < {TARGET_ACCURACY:.0%}      →  门槛不变  防止过拟合震荡\n"
+        f"精准率 > {TARGET_ACCURACY+0.10:.0%}  →  门槛 +2%   放宽，挖掘机会\n"
+        f"精准率 > {TARGET_ACCURACY:.0%}      →  门槛 +1%   微幅放宽\n"
         f"否  则        →  不变\n"
         "```"
     )
+    low_acc_cap = (risk_guards.get("low_accuracy_cap", {}) or {})
+    acc30_gate = float(low_acc_cap.get("acc_30d_threshold", 0.40))
+    cap_pct = float(low_acc_cap.get("max_buy_top_pct", 0.12))
     adaptive_lines = [
         f"**自适应调整规则**　目标精准率 {TARGET_ACCURACY:.0%}",
         adaptive_block,
-        f"门槛范围限制：[5%, 20%]",
+        f"门槛范围限制：按市场状态动态约束（当前 {cur_state}）",
+        f"30日精准率 < {acc30_gate:.0%} 时，上限强制收敛到 **{cap_pct:.0%}**",
     ]
 
     elements = [
@@ -2872,4 +4037,3 @@ def cmd_learn(arg: str | None, chat_id: str = "") -> str:
         f"🤖 开始学习 · {date_display} · 模式: {mode_text}\n"
         f"后台运行中,完成后会主动推送结果。"
     )
-

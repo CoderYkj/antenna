@@ -14,6 +14,7 @@ import re
 import time
 import threading
 import logging
+import signal
 
 if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
@@ -22,6 +23,8 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 os.chdir(ROOT)
+# 禁用第三方进度条输出，避免 PM2 日志中出现大量控制字符噪音。
+os.environ.setdefault("TQDM_DISABLE", "1")
 
 import requests
 import yaml
@@ -79,6 +82,28 @@ class FeishuPoller:
         self.bot_open_id = ""
         self._cmd_lock   = threading.Lock()
         self._cmd_active = 0  # 当前正在处理的重型指令数
+        self._stop_event = threading.Event()
+
+    def _handle_shutdown_signal(self, signum, _frame):
+        if hasattr(signal, "Signals"):
+            try:
+                signame = signal.Signals(signum).name
+            except ValueError:
+                signame = str(signum)
+        else:
+            signame = str(signum)
+        if not self._stop_event.is_set():
+            log.info(f"收到退出信号 {signame}，准备优雅停机...")
+        self._stop_event.set()
+
+    def _install_signal_handlers(self):
+        if threading.current_thread() is not threading.main_thread():
+            return
+        for sig_name in ("SIGINT", "SIGTERM"):
+            sig = getattr(signal, sig_name, None)
+            if sig is None:
+                continue
+            signal.signal(sig, self._handle_shutdown_signal)
 
     # ── Token ────────────────────────────────────────────────
 
@@ -279,6 +304,7 @@ class FeishuPoller:
 
     def run(self):
         log.info("初始化...")
+        self._install_signal_handlers()
         self._init_bot_info()
 
         # 初始化各 chat 的游标为当前时间，避免处理历史消息
@@ -289,7 +315,7 @@ class FeishuPoller:
         log.info(f"监控 {len(chats)} 个会话，轮询间隔 {POLL_INTERVAL}s")
         log.info("已就绪，等待飞书消息 ...")
 
-        while True:
+        while not self._stop_event.is_set():
             try:
                 chats = self._get_chats()
                 for chat in chats:
@@ -318,10 +344,15 @@ class FeishuPoller:
                             daemon=True,
                         ).start()
 
+            except KeyboardInterrupt:
+                if not self._stop_event.is_set():
+                    log.info("收到中断信号，准备优雅停机...")
+                self._stop_event.set()
             except Exception as e:
                 log.error(f"轮询出错: {e}", exc_info=True)
 
-            time.sleep(POLL_INTERVAL)
+            self._stop_event.wait(POLL_INTERVAL)
+        log.info("轮询器已优雅退出。")
 
 
 if __name__ == "__main__":

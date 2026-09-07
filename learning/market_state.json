@@ -4,10 +4,10 @@
   "pending": null,
   "pending_days": 0,
   "hs300": {
-    "close": 4871.91,
-    "ma60": 4661.22,
-    "ret_60d": 0.0352,
-    "atr_pct": 0.0116
+    "close": 4625.09,
+    "ma60": 4735.17,
+    "ret_60d": -0.0398,
+    "atr_pct": 0.0146
   },
   "history": [
     {
@@ -829,7 +829,11 @@
     {
       "date": "2026-04-29",
       "state": "range"
+    },
+    {
+      "date": "2026-08-31",
+      "state": "range"
     }
   ],
-  "updated_at": "2026-05-09T15:13:05"
+  "updated_at": "2026-08-31T17:40:55"
 }

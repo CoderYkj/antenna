@@ -1,82 +1,26 @@
 {
   "version": 1,
-  "updated_at": "2026-05-11T17:16:52",
+  "updated_at": "2026-08-31T17:41:04",
   "entries": {
-    "600967|range": {
-      "until": "2026-05-29",
-      "streak_count": 4,
-      "last_miss": "2026-04-24",
-      "added_at": "2026-04-29",
-      "reason": "range 状态下连续 4 次 buy+miss/weak"
-    },
-    "603105|range": {
-      "until": "2026-05-29",
+    "301117|range": {
+      "until": "2026-09-30",
       "streak_count": 3,
-      "last_miss": "2026-04-24",
-      "added_at": "2026-04-29",
+      "last_miss": "2026-08-28",
+      "added_at": "2026-08-31",
       "reason": "range 状态下连续 3 次 buy+miss/weak"
     },
-    "300471|range": {
-      "until": "2026-05-29",
+    "001286|range": {
+      "until": "2026-09-30",
       "streak_count": 3,
-      "last_miss": "2026-04-23",
-      "added_at": "2026-04-29",
+      "last_miss": "2026-08-26",
+      "added_at": "2026-08-31",
       "reason": "range 状态下连续 3 次 buy+miss/weak"
     },
-    "300581|range": {
-      "until": "2026-05-29",
-      "streak_count": 6,
-      "last_miss": "2026-04-23",
-      "added_at": "2026-04-29",
-      "reason": "range 状态下连续 6 次 buy+miss/weak"
-    },
-    "600775|range": {
-      "until": "2026-05-29",
+    "003021|range": {
+      "until": "2026-09-30",
       "streak_count": 3,
-      "last_miss": "2026-04-23",
-      "added_at": "2026-04-29",
-      "reason": "range 状态下连续 3 次 buy+miss/weak"
-    },
-    "600621|range": {
-      "until": "2026-05-29",
-      "streak_count": 4,
-      "last_miss": "2026-04-22",
-      "added_at": "2026-04-29",
-      "reason": "range 状态下连续 4 次 buy+miss/weak"
-    },
-    "002365|range": {
-      "until": "2026-05-27",
-      "streak_count": 4,
-      "last_miss": "2026-04-21",
-      "added_at": "2026-04-27",
-      "reason": "range 状态下连续 4 次 buy+miss/weak"
-    },
-    "000001|range": {
-      "until": "2026-05-27",
-      "streak_count": 7,
-      "last_miss": "2026-04-20",
-      "added_at": "2026-04-27",
-      "reason": "range 状态下连续 7 次 buy+miss/weak"
-    },
-    "600737|range": {
-      "until": "2026-05-27",
-      "streak_count": 3,
-      "last_miss": "2026-04-20",
-      "added_at": "2026-04-27",
-      "reason": "range 状态下连续 3 次 buy+miss/weak"
-    },
-    "301367|range": {
-      "until": "2026-06-10",
-      "streak_count": 4,
-      "last_miss": "2026-05-08",
-      "added_at": "2026-05-11",
-      "reason": "range 状态下连续 4 次 buy+miss/weak"
-    },
-    "688708|range": {
-      "until": "2026-06-10",
-      "streak_count": 3,
-      "last_miss": "2026-05-08",
-      "added_at": "2026-05-11",
+      "last_miss": "2026-08-24",
+      "added_at": "2026-08-31",
       "reason": "range 状态下连续 3 次 buy+miss/weak"
     }
   },
@@ -216,6 +160,107 @@
       "state": "range",
       "streak": 3,
       "until": "2026-06-10"
+    },
+    {
+      "date": "2026-08-31",
+      "action": "expire",
+      "code": "600967",
+      "state": "range",
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-08-31",
+      "action": "expire",
+      "code": "603105",
+      "state": "range",
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-08-31",
+      "action": "expire",
+      "code": "300471",
+      "state": "range",
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-08-31",
+      "action": "expire",
+      "code": "300581",
+      "state": "range",
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-08-31",
+      "action": "expire",
+      "code": "600775",
+      "state": "range",
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-08-31",
+      "action": "expire",
+      "code": "600621",
+      "state": "range",
+      "until": "2026-05-29"
+    },
+    {
+      "date": "2026-08-31",
+      "action": "expire",
+      "code": "002365",
+      "state": "range",
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-08-31",
+      "action": "expire",
+      "code": "000001",
+      "state": "range",
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-08-31",
+      "action": "expire",
+      "code": "600737",
+      "state": "range",
+      "until": "2026-05-27"
+    },
+    {
+      "date": "2026-08-31",
+      "action": "expire",
+      "code": "301367",
+      "state": "range",
+      "until": "2026-06-10"
+    },
+    {
+      "date": "2026-08-31",
+      "action": "expire",
+      "code": "688708",
+      "state": "range",
+      "until": "2026-06-10"
+    },
+    {
+      "date": "2026-08-31",
+      "action": "add",
+      "code": "301117",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-09-30"
+    },
+    {
+      "date": "2026-08-31",
+      "action": "add",
+      "code": "001286",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-09-30"
+    },
+    {
+      "date": "2026-08-31",
+      "action": "add",
+      "code": "003021",
+      "state": "range",
+      "streak": 3,
+      "until": "2026-09-30"
     }
   ]
 }

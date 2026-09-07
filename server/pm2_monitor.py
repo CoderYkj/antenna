@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import html
 import json
+import logging
 import shutil
 import subprocess
 import time
@@ -244,15 +245,66 @@ def logs(name: str):
     if not name or "/" in name or " " in name:
         abort(400, description="invalid process name")
     lines = _mon_cfg().get("log_lines", 200)
-    rc, out, err = _pm2("logs", name, "--lines", str(lines), "--nostream")
-    text = out or err or "(no logs)"
+    text = _tail_logs_text(name, lines)
+    safe_name = html.escape(str(name))
+    safe_text = html.escape(text)
     return Response(
-        f"<pre style='background:#0e1116;color:#e6edf3;padding:20px;"
-        f"font:12px/1.4 monospace;white-space:pre-wrap'>"
-        f"<a href='/' style='color:#58a6ff'>&larr; back</a>\n\n"
-        f"{html.escape(text)}</pre>",
+        (
+            "<!doctype html><html lang='zh-CN'><head><meta charset='utf-8'>"
+            f"<title>{safe_name} logs</title>"
+            "<style>"
+            "body{background:#0e1116;color:#e6edf3;margin:0;padding:16px;"
+            "font:12px/1.4 ui-monospace,Consolas,monospace}"
+            ".top{margin-bottom:10px;font:13px/1.4 -apple-system,'Segoe UI',sans-serif}"
+            "a{color:#58a6ff;text-decoration:none}a:hover{text-decoration:underline}"
+            "#log{background:#0b0f14;border:1px solid #30363d;border-radius:6px;padding:12px;"
+            "white-space:pre-wrap;word-break:break-word;min-height:70vh}"
+            ".meta{color:#8b949e;margin-left:8px;font-size:12px}"
+            "</style></head><body>"
+            f"<div class='top'><a href='/'>← back</a> · {safe_name}"
+            "<span id='meta' class='meta'>实时更新中…</span></div>"
+            f"<pre id='log'>{safe_text}</pre>"
+            "<script>"
+            "const name = " + json.dumps(name) + ";"
+            "const logEl = document.getElementById('log');"
+            "const metaEl = document.getElementById('meta');"
+            "async function tick(){"
+            "  const stickBottom = (window.innerHeight + window.scrollY) >= (document.body.offsetHeight - 20);"
+            "  try{"
+            "    const r = await fetch('/api/logs/' + encodeURIComponent(name), {cache:'no-store'});"
+            "    if(!r.ok){ metaEl.textContent='获取失败: HTTP ' + r.status; return; }"
+            "    const data = await r.json();"
+            "    logEl.textContent = data.text || '(no logs)';"
+            "    metaEl.textContent = '最后更新 ' + (data.updated_at || '--');"
+            "    if(stickBottom){ window.scrollTo(0, document.body.scrollHeight); }"
+            "  }catch(e){ metaEl.textContent='获取失败: ' + e; }"
+            "}"
+            "setInterval(tick, 2000);"
+            "tick();"
+            "</script></body></html>"
+        ),
         mimetype="text/html",
     )
+
+
+def _tail_logs_text(name: str, lines: int) -> str:
+    rc, out, err = _pm2("logs", name, "--lines", str(lines), "--nostream")
+    return out or err or "(no logs)"
+
+
+@app.route("/api/logs/<name>")
+@_require_auth
+def api_logs(name: str):
+    if not name or "/" in name or " " in name:
+        abort(400, description="invalid process name")
+    lines = _mon_cfg().get("log_lines", 200)
+    text = _tail_logs_text(name, lines)
+    return jsonify({
+        "name": name,
+        "lines": lines,
+        "updated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "text": text,
+    })
 
 
 @app.route("/api/processes")
@@ -277,6 +329,9 @@ def main():
         raise RuntimeError(
             "config.yaml.pm2_monitor.password 未配置,拒绝启动以避免监控面板裸奔。"
         )
+    # 高频轮询会产生大量 GET 访问日志，默认仅保留错误日志，避免噪音淹没关键信息。
+    if not bool(cfg.get("access_log", False)):
+        logging.getLogger("werkzeug").setLevel(logging.ERROR)
     print(f"[pm2_monitor] 启动 http://{host}:{port}  user={cfg.get('username','admin')}")
     # 生产环境用 waitress / gunicorn 更好,这里用 Flask 自带服务器足够
     app.run(host=host, port=port, debug=False, use_reloader=False)

@@ -49,6 +49,31 @@
       },
       "final_buy_top_pct": 0.08,
       "completed_at": "2026-04-25T15:42:09.891397"
+    },
+    {
+      "period": "2026-08",
+      "period_type": "month",
+      "start": "2026-08-01",
+      "end": "2026-08-31",
+      "total_buy_sigs": 190,
+      "total_hits": 89,
+      "accuracy": 0.4684,
+      "trading_days": 20,
+      "days_with_buys": 19,
+      "best_day": {
+        "date": "2026-08-04",
+        "hits": 10,
+        "total": 10,
+        "accuracy": 1.0
+      },
+      "worst_day": {
+        "date": "2026-08-19",
+        "hits": 0,
+        "total": 10,
+        "accuracy": 0.0
+      },
+      "final_buy_top_pct": 0.15,
+      "completed_at": "2026-08-31T17:36:52.672533"
     }
   ]
 }

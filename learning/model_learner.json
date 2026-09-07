@@ -1,28 +1,28 @@
 {
   "abs_threshold": 0.34,
-  "last_calibrated": "2026-05-09T15:13:03",
+  "last_calibrated": "2026-08-31T17:41:04",
   "last_retrained": null,
-  "model_file": "models\\saved\\model_20260508.pkl",
-  "model_sha": "3d811694316d",
+  "model_file": "models/saved/model_20260825.pkl",
+  "model_sha": "0ce35f9dff6f",
   "calibrators": {
     "bull": {
-      "samples": 568,
-      "brier_before": 0.2184,
-      "brier_after": 0.1892,
+      "samples": 190,
+      "brier_before": 0.2462,
+      "brier_after": 0.2096,
       "status": "ok",
       "used_fallback_global": true
     },
     "bear": {
-      "samples": 568,
-      "brier_before": 0.2184,
-      "brier_after": 0.1892,
+      "samples": 190,
+      "brier_before": 0.2462,
+      "brier_after": 0.2096,
       "status": "ok",
       "used_fallback_global": true
     },
     "range": {
-      "samples": 568,
-      "brier_before": 0.2184,
-      "brier_after": 0.1892,
+      "samples": 190,
+      "brier_before": 0.2462,
+      "brier_after": 0.2096,
       "status": "ok",
       "used_fallback_global": false
     }
@@ -41,6 +41,13 @@
       "buy_signals": 190,
       "abs_threshold": 0.34,
       "change": "0.32 → 0.34: acc_30d 0.184 < 35%, 收严"
+    },
+    {
+      "date": "2026-08-31",
+      "acc_30d": 0.4684,
+      "buy_signals": 190,
+      "abs_threshold": 0.34,
+      "change": "0.34 → 0.34: acc_30d 0.468 维持区间"
     }
   ]
 }

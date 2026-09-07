@@ -1,32 +1,42 @@
+const path = require('path');
+
+const rootDir = __dirname;
+const logsDir = path.join(rootDir, 'logs');
+const isWindows = process.platform === 'win32';
+const pythonBin = process.env.ANTENNA_PYTHON || (isWindows ? 'python' : 'python3');
+
 module.exports = {
   apps: [
     {
       name: 'antenna-bot',
-      cwd: 'e:/antenna/server',
-      script: 'start.cjs',
-      interpreter: 'C:/Program Files/nodejs/node.exe',
+      cwd: rootDir,
+      script: 'server/feishu_poll.py',
+      interpreter: pythonBin,
       restart_delay: 5000,
       max_restarts: 10,
       env: {
-        PYTHONUNBUFFERED: '1'
+        PYTHONUNBUFFERED: '1',
+        ANTENNA_PYTHON: pythonBin,
+        TQDM_DISABLE: '1'
       },
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
-      error_file: 'e:/antenna/logs/pm2-error.log',
-      out_file: 'e:/antenna/logs/pm2-out.log'
+      error_file: path.join(logsDir, 'pm2-error.log'),
+      out_file: path.join(logsDir, 'pm2-out.log')
     },
     {
       name: 'pm2-monitor',
-      cwd: 'e:/antenna',
+      cwd: rootDir,
       script: 'server/pm2_monitor.py',
-      interpreter: 'C:/Python314/python.exe',
+      interpreter: pythonBin,
       restart_delay: 5000,
       max_restarts: 10,
       env: {
-        PYTHONUNBUFFERED: '1'
+        PYTHONUNBUFFERED: '1',
+        TQDM_DISABLE: '1'
       },
       log_date_format: 'YYYY-MM-DD HH:mm:ss',
-      error_file: 'e:/antenna/logs/pm2-monitor-error.log',
-      out_file: 'e:/antenna/logs/pm2-monitor-out.log'
+      error_file: path.join(logsDir, 'pm2-monitor-error.log'),
+      out_file: path.join(logsDir, 'pm2-monitor-out.log')
     }
   ]
-}
+};

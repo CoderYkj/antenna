@@ -1,4 +1,6 @@
 import akshare as ak
+import contextlib
+import io
 import logging
 import pandas as pd
 import urllib.request
@@ -206,14 +208,27 @@ def fetch_financial_data(code: str) -> dict:
     em_code   = f"{code}{em_suffix}"
 
     _KNOWN_EMPTY = ("no tables found", "nonetype' object has no attribute")
+    _ABSTRACT_JSON_NOISE = (
+        "expecting value: line 1 column 1",
+        "jsondecodeerror",
+        "json decode error",
+    )
+    
+    def _call_quietly(fn):
+        # 部分三方财务接口会直接向 stdout/stderr 打进度条，PM2 下会形成控制字符噪音。
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            return fn()
 
     def _fetch(key: str, fn):
         try:
-            result[key] = fn()
+            result[key] = _call_quietly(fn)
         except Exception as e:
             msg = str(e).lower()
             if any(k in msg for k in _KNOWN_EMPTY):
                 log.debug("[fetcher] %s %s 无数据: %s", code, key, e)
+            elif key == "abstract" and any(k in msg for k in _ABSTRACT_JSON_NOISE):
+                # 新浪摘要接口偶发返回空/非 JSON；该噪声高频但不影响主流程。
+                log.debug("[fetcher] %s %s 接口返回异常内容，已跳过: %s", code, key, e)
             else:
                 log.warning("[fetcher] %s %s 失败: %s", code, key, e)
 

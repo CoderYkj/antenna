@@ -109,8 +109,6 @@ antenna/
 │   ├── task_daily_review.py       # 收盘复盘
 │   ├── task_noon_review.py        # 午间复盘
 │   ├── task_train.py              # 定时训练
-│   ├── task_fill_5d_metrics.py    # 每日回填 5 日 hit/回撤指标
-│   ├── smoke_test.py              # 功能冒烟测试（核心指令响应校验）
 │   ├── run_*.bat                  # 任务计划入口
 │   └── setup_tasks.ps1            # Windows 任务计划一键注册
 │
@@ -161,7 +159,7 @@ python cli.py train --weighted       # P1 加权重训（按历史 signal × hit
 # 前台启动（开发期）
 python server/feishu_poll.py
 
-# PM2 托管启动（生产推荐）
+# PM2 托管启动（生产推荐；Windows / Linux 通用）
 pm2 start ecosystem.config.cjs   # 同时启动 antenna-bot + pm2-monitor
 pm2 save                          # 持久化进程列表，重启系统后自动恢复
 
@@ -268,7 +266,7 @@ python cli.py <subcommand> [options]
 |------|------|------|
 | `学习 (日期)` | `学习` / `学习 2026-04-29` | 跑全部 6 个学习模块 |
 | `学习 dry-run` | `学习 演练` | 演练，不写盘 |
-| `策略` | `策略` | 当前选股门槛、精准率、abs_threshold |
+| `策略` | `策略` | 当前选股门槛、精准率、7天/30天看板核心指标 |
 
 #### 其他
 
@@ -469,6 +467,36 @@ P0 内置自适应选股门槛，每日收盘后自动运行（独立于 P1 校�
 
 P1 在此之上追加 `abs_threshold`（绝对概率门槛，月度自校），形成双门槛体系。
 
+另外新增了**风险护栏**（同样写入 `learning/strategy.json`）：
+
+- 按市场状态动态限制 `buy_top_pct` 范围（bull/range/bear 不同上限与下限）
+- 当 30 日买入精准率低于阈值（默认 40%）时，进一步收紧 `buy_top_pct` 上限（默认 12%）
+- 策略面板会同步展示当前状态下的护栏范围与仓位建议（bull 100% / range 60% / bear 30%）
+- `推荐` 扫描结果卡片会同步展示护栏提示（当前门槛、状态区间、建议仓位、是否触发 30 日收敛上限）
+- `复盘` / `task_daily_review.py` 会落地并展示护栏追踪（门槛变更前后、状态区间、触发原因），用于审计与回溯
+- 护栏触发原因会自动转换为中文标签（如“状态区间限幅”“30日低精准率上限收敛”），便于运营复盘
+- `策略` / `复盘` 页面会展示近 30 日护栏触发统计与主要原因分布，便于观察风控压力变化
+- `策略` / `复盘` 新增 7 天与 30 天监控看板核心字段：命中率、样本量、均笔收益、最大回撤、Top5 命中率
+- `复盘` 卡片会基于 7d/30d 对比自动给出“提精风险告警”（如过度降级风险、短期命中率漂移、短期回撤恶化）
+- `策略` 指令页也会同步展示“提精风险告警”，便于在会话内即时决策参数回调
+- `推荐` 新增“提精闸门”：当 7/30 日命中率走弱且样本充足时，自动将低质量买入候选降级为观望（可通过 `scan.recommend_precision_gate` 配置）
+- 提精闸门新增“概率分桶可靠性”检查：若某概率区间在近 30 日命中率偏低且样本充足，会优先降级该区间买入候选，减少系统性误报
+- 提精闸门新增“置信度分层可靠性”检查：若高/中/低置信度桶近期命中率低于阈值，会自动收紧对应桶的买入候选
+- 提精闸门新增“战法可靠性”检查：若命中战法在当前市场状态下样本充足但历史精准率偏弱，会降级相关买入候选以降低误报
+- 提精闸门新增“个股近期命中记忆”检查：若个股近 30 日买入样本命中率持续偏弱，会自动降级该标的买入信号
+- 提精闸门新增“收益/风险性价比”检查：若预期涨幅不足或相对历史回撤的收益风险比偏低，会降级对应买入候选
+- 提精闸门新增“技术共振确认”检查：当 RSI / MACD / 量比 / 价格趋势确认数不足时，会在弱势期自动降级买入候选
+- 提精闸门新增“个股回撤风险记忆”检查：若个股近阶段 5 日深回撤发生率过高，会自动降级对应买入候选
+- 提精闸门新增“流动性质量”检查：当换手率过低/过热或量比不足时，会自动降级对应买入候选
+- 提精闸门新增“趋势一致性”检查：当均线结构与收盘位置不满足趋势对齐条件时，会自动降级对应买入候选
+- 提精闸门新增“趋势过热偏离”检查：当收盘价相对 MA20 偏离过大（追高风险）时，会自动降级对应买入候选
+- 提精闸门新增“极端波动”检查：当 ATR/价格波动比异常偏高时，会自动降级对应买入候选
+- 提精闸门新增“概率边际”检查：当个股涨概率仅略高于全市场买入门槛时，会自动降级边际信号候选
+- 提精闸门新增“双周期目标一致性”检查：当短线/长线目标涨幅不足或长线相对短线失衡时，会自动降级对应买入候选
+- 提精闸门新增“ATR收益比”检查：当预期涨幅相对 ATR 波动补偿不足时，会自动降级对应买入候选
+- 冲刺后复盘新增“自适应阈值调优”：在弱势边缘自动轻放松（soft），在显著失压时自动收紧（strict），并按样本量自动衰减调优强度，减少小样本过调
+- 参数收敛细化：弱模式默认下调了边际/流动性/ATR收益比等阈值的“过严”程度（并保留 hard 模式收紧），降低误杀高质量候选
+
 ---
 
 ## PM2 进程管理
@@ -482,12 +510,21 @@ P1 在此之上追加 `abs_threshold`（绝对概率门槛，月度自校），�
 npm install -g pm2
 ```
 
+`ecosystem.config.cjs` 现已使用**相对路径 + 自动选择 Python 解释器**，Windows / Linux 均可直接复用；若你的环境没有 `python`/`python3` 命令，可在启动前指定：
+
+```bash
+export ANTENNA_PYTHON=/usr/bin/python3
+pm2 start ecosystem.config.cjs
+```
+
 ### 进程清单（ecosystem.config.cjs）
 
 | 进程名 | 启动脚本 | 说明 |
 |--------|---------|------|
-| `antenna-bot` | `server/start.cjs` → `feishu_poll.py` | 飞书机器人（主进程） |
+| `antenna-bot` | `server/feishu_poll.py` | 飞书机器人（主进程） |
 | `pm2-monitor` | `server/pm2_monitor.py` | Web 监控面板（Flask） |
+
+> 默认会设置 `TQDM_DISABLE=1`，抑制第三方库进度条控制字符，减少 PM2 日志噪音。
 
 ### 常用命令
 
@@ -523,9 +560,79 @@ logs/pm2-monitor-out.log   # pm2-monitor 标准输出
 logs/pm2-monitor-error.log # pm2-monitor 错误
 ```
 
+### Linux 更新部署（推荐）
+
+仓库内置一键脚本 `scripts/deploy_linux.sh`，用于：
+
+- 拉取远端最新代码（`git pull --ff-only`）
+- 创建/复用虚拟环境并安装依赖
+- 重启 PM2 进程并保存
+- 可选执行 `scripts/smoke_test.py` 做健康检查
+
+运行手册见：`docs/linux-deploy-runbook.md`
+
+如果你是在本地机器上直接发布到远端 Linux（当前默认目标：`115.29.240.130:/data/antenna`），可使用固定入口：
+
+```bash
+# 建议用环境变量提供密码（避免写在命令行历史）
+export ANTENNA_REMOTE_PASSWORD='***'
+python scripts/deploy_remote.py
+```
+
+该命令会自动执行：打包当前 `HEAD` → 上传并解压到远端 → 运行 `deploy_linux.sh`（`SKIP_GIT_PULL=1`）→ `pm2` 重启 → `healthz` 与日志实时页检查。
+
+首次执行：
+
+```bash
+cd /path/to/antenna
+chmod +x scripts/deploy_linux.sh
+DEPLOY_BRANCH=main APP_DIR=/path/to/antenna ./scripts/deploy_linux.sh
+```
+
+常用参数：
+
+- `PYTHON_BIN`：Python 命令（默认 `python3`）
+- `VENV_DIR`：虚拟环境目录（默认 `.venv`）
+- `SKIP_SMOKE_TEST=1`：跳过 smoke test
+- `ALLOW_DIRTY=1`：允许有未提交改动时继续部署（默认禁止）
+- `SKIP_GIT_PULL=1`：跳过 `git fetch/pull`（仅重装依赖并重启服务）
+- `DEPLOY_REF=<commit/tag>`：部署指定提交或标签（detach 模式）
+- `ROLLBACK_ON_FAILURE=1`：部署失败自动回滚到部署前版本并尝试拉起 PM2
+- `DEPLOY_LOCK_FILE`：部署锁文件路径（默认 `.deploy.lock`，防并发部署）
+- `AUTO_TRAIN_IF_MISSING=1`：若未发现 `models/saved/model_*.pkl`，自动训练（默认开启）
+- `TRAIN_WEIGHTED_IF_MISSING=1`：模型缺失时使用 `train --weighted` 自动训练
+
+示例（跳过 smoke test）：
+
+```bash
+DEPLOY_BRANCH=main SKIP_SMOKE_TEST=1 ./scripts/deploy_linux.sh
+```
+
+示例（部署指定 tag，失败自动回滚）：
+
+```bash
+DEPLOY_REF=v2.1.0 ROLLBACK_ON_FAILURE=1 ./scripts/deploy_linux.sh
+```
+
+如果服务器目录不是 git 仓库（例如通过压缩包/rsync 发布），请使用：
+
+```bash
+SKIP_GIT_PULL=1 ./scripts/deploy_linux.sh
+```
+
+若你遇到“`No model found in models/saved`”报错，直接执行：
+
+```bash
+cd /path/to/antenna
+source .venv/bin/activate
+python cli.py train
+pm2 restart antenna-bot
+```
+
 ### Web 监控面板
 
 `server/pm2_monitor.py` 提供 Basic Auth 保护的 Web 面板，支持查看进程状态、Restart / Stop / Start 操作、查看最近日志。
+日志页现已支持前端每 2 秒自动拉取 `/api/logs/<name>`，无需手动刷新即可近实时查看新日志。
 
 在 `config.yaml` 中配置：
 
@@ -536,6 +643,7 @@ pm2_monitor:
   username:  "admin"
   password:  "your_password"   # 必填，留空则拒绝启动
   log_lines: 200               # /logs 页面显示最近多少行
+  access_log: false            # 默认关闭访问日志，减少 /api/logs 轮询噪音
 ```
 
 面板地址：`http://<host>:9615`（每 10 秒自动刷新）。健康检查端点（无鉴权）：`http://<host>:9615/healthz`。
@@ -553,7 +661,7 @@ pm2_monitor:
 | `Antenna-Predict-AM` | 工作日 09:30 起每 10 min | 上午盘中预测（动态特征列 + alt） |
 | `Antenna-Predict-PM` | 工作日 13:00 起每 10 min | 下午盘中预测 |
 | `Antenna-Noon-Review` | 工作日 11:32 | 午间复盘 |
-| `Antenna-Daily-Review` | 工作日 15:32 | 收盘复盘 + 策略调整（内部调用 `scripts/task_fill_5d_metrics.py` 回填 5 日指标） |
+| `Antenna-Daily-Review` | 工作日 15:32 | 收盘复盘 + 策略调整 |
 | `Antenna-WeeklyTrain` | **周日 20:00** | P1 加权重训 |
 | `Antenna-LearnWeekly` | **周日 02:30** | P3/P4 学习编排（特征剪枝 + 价位网格搜索） |
 
@@ -604,7 +712,7 @@ python cli.py style              # 真实写入
 - **机器人**：requests（飞书 Open Platform）
 - **进程管理**：PM2（Node.js）+ Windows 任务计划
 - **存储**：Parquet（行情缓存 + alt 缓存）+ JSONL（pred / outcome 归档）
-- **测试**：pytest（402 用例，覆盖学习系统全链路）+ `scripts/smoke_test.py`（飞书指令冒烟测试）
+- **测试**：pytest（384 用例，覆盖学习系统全链路）
 
 ---
 

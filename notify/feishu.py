@@ -161,6 +161,10 @@ def send_review_report(webhook_url: str, report: dict) -> bool:
     t30        = report.get("samples_30", 0)
     change     = report.get("change_desc", "")
     strategy   = report.get("strategy", {})
+    guardrail_trace = report.get("guardrail_trace", {})
+    guardrail_trace_text = report.get("guardrail_trace_text", "")
+    guardrail_summary = report.get("guardrail_summary", {})
+    dashboard = report.get("dashboard_metrics", {})
     buy_top_pct = strategy.get("buy_top_pct", 0.15)
     target      = strategy.get("target_accuracy", 0.55)
 
@@ -241,11 +245,44 @@ def send_review_report(webhook_url: str, report: dict) -> bool:
     )
     elements.append({"tag": "markdown", "content": f"**📈 精准率追踪**\n{acc_section}"})
 
+    windows = dashboard.get("windows", {}) if isinstance(dashboard, dict) else {}
+    w7 = windows.get("7d", {}) if isinstance(windows, dict) else {}
+    w30 = windows.get("30d", {}) if isinstance(windows, dict) else {}
+    if w7 and w30:
+        elements.append({"tag": "hr"})
+        monitor_section = (
+            f"7天　命中 **{float(w7.get('hit_rate', 0)):.1%}**（{int(w7.get('samples', 0))}）"
+            f"｜均笔 **{float(w7.get('avg_return', 0)):.2%}**｜回撤 **{float(w7.get('max_drawdown', 0)):.2%}\n"
+            f"30天 命中 **{float(w30.get('hit_rate', 0)):.1%}**（{int(w30.get('samples', 0))}）"
+            f"｜均笔 **{float(w30.get('avg_return', 0)):.2%}**｜回撤 **{float(w30.get('max_drawdown', 0)):.2%}\n"
+            f"Top5命中率　7天 **{float((w7.get('topn_hit_rate') or {}).get('top5', 0)):.1%}**"
+            f"｜30天 **{float((w30.get('topn_hit_rate') or {}).get('top5', 0)):.1%}**"
+        )
+        elements.append({"tag": "markdown", "content": f"**🧭 7天/30天监控看板**\n{monitor_section}"})
+    alerts = dashboard.get("alerts", []) if isinstance(dashboard, dict) else []
+    if alerts:
+        alert_lines = [f"⚠️ {a.get('message', '')}" for a in alerts[:3] if a.get("message")]
+        if alert_lines:
+            elements.append({"tag": "markdown", "content": "**🚨 提精风险告警**\n" + "\n".join(alert_lines)})
+
     # ── 策略调整 ───────────────────────────────────────────
     elements.append({"tag": "hr"})
+    from learning.optimizer import build_guardrail_trace_text
+    guardrail_line = guardrail_trace_text or build_guardrail_trace_text(guardrail_trace)
+    guardrail_line = guardrail_line.replace("，", "　")
+    summary_line = ""
+    if guardrail_summary.get("total_days", 0) > 0:
+        top_items = guardrail_summary.get("top_reasons") or []
+        top_str = "、".join(f"{x['label']}×{x['count']}" for x in top_items[:3]) if top_items else "无"
+        summary_line = (
+            f"30日护栏　触发 **{guardrail_summary['trigger_days']} / {guardrail_summary['total_days']}**"
+            f"（{guardrail_summary['trigger_rate']:.0%}）　主要原因 {top_str}"
+        )
     strategy_md = (
         f"当前买入门槛　涨概率前 **{buy_top_pct:.0%}**\n"
-        f"调整说明　{change}"
+        f"调整说明　{change}\n"
+        f"{guardrail_line}"
+        + (f"\n{summary_line}" if summary_line else "")
     )
     elements.append({"tag": "markdown", "content": f"**⚙️ 策略自优化**\n{strategy_md}"})
 

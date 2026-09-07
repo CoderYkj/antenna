@@ -30,7 +30,6 @@ Look
 Set
 
 # Learning system runtime artifacts (P0+)
-learning/data/
 learning/feedback/
 learning/history/
 learning/alerts.jsonl
@@ -38,3 +37,12 @@ learning/replay/
 learning/*.json.bak
 data/cache/alt/*
 !data/cache/alt/.gitkeep
+
+
+# Linux server deployment runtime (added during git repair 2026-09-07)
+.venv/
+.git.broken.bak
+learning/data/
+learning/ai_reason_cache.json
+data/fin_cache.json
+config.yaml

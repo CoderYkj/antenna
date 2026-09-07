@@ -17,15 +17,22 @@ optimizer.py - 基于历史买入信号精准率，动态调整"买入"信号的
   范围限制：[0.08, 0.25]
   自救机制：若 buy_top_pct 连续 7 天处于下限 0.08 且精准率无改善，重置为 0.15
 """
+import copy
 import json
 from datetime import datetime, date, timedelta
 from pathlib import Path
 
 from learning.tracker import load_predictions, load_outcomes, list_prediction_dates
+from learning.market_state import load_current_state
 
 STRATEGY_FILE   = Path("learning/strategy.json")
 TARGET_ACCURACY = 0.55   # 目标买入精准率（A股短线现实水平）
 RISE_THRESHOLD  = 1.0    # 买入命中 = 实际涨幅 >= 此值（%，从1.5%降至1.0%更贴近实际）
+GUARDRAIL_REASON_LABELS = {
+    "state_bound_clamp": "状态区间限幅",
+    "low_acc_30d_cap": "30日低精准率上限收敛",
+    "floor_reset": "下限连续触发重置",
+}
 
 
 def load_strategy() -> dict:
@@ -34,7 +41,7 @@ def load_strategy() -> dict:
             with open(STRATEGY_FILE, encoding="utf-8") as f:
                 content = f.read()
             if content.strip():
-                return json.loads(content)
+                return _merge_with_defaults(json.loads(content))
         except (json.JSONDecodeError, OSError):
             pass  # 文件为空或读取失败，回退默认值
     return _default_strategy()
@@ -66,7 +73,145 @@ def _default_strategy() -> dict:
         "accuracy_30d":   None,
         "last_updated":   None,
         "floor_days":     0,      # buy_top_pct 连续处于 0.05 下限的天数
+        "positioning": {          # Regime 仓位建议（供面板展示与人工执行）
+            "bull": 1.0,
+            "range": 0.6,
+            "bear": 0.3,
+        },
+        "risk_guardrails": {
+            # 按市场状态限制 buy_top_pct 上下限，防止高风险状态过度放宽
+            "by_state_bounds": {
+                "bull": {"min": 0.08, "max": 0.25},
+                "range": {"min": 0.08, "max": 0.20},
+                "bear": {"min": 0.06, "max": 0.14},
+            },
+            # 长周期准确率偏低时，额外收紧上限
+            "low_accuracy_cap": {
+                "acc_30d_threshold": 0.40,
+                "max_buy_top_pct": 0.12,
+            },
+        },
         "history":        [],
+    }
+
+
+def _merge_with_defaults(strategy: dict) -> dict:
+    """向后兼容旧 strategy.json：补齐新增字段，不覆盖用户已有配置。"""
+    merged = copy.deepcopy(_default_strategy())
+    if not isinstance(strategy, dict):
+        return merged
+    for k, v in strategy.items():
+        if isinstance(v, dict) and isinstance(merged.get(k), dict):
+            merged[k].update(v)
+        else:
+            merged[k] = v
+    return merged
+
+
+def _resolve_buy_top_bounds(strategy: dict, acc_30d: float) -> tuple[float, float, str]:
+    """按市场状态与长期准确率解析 buy_top_pct 的动态上下限。"""
+    current_state = load_current_state().get("current", "range")
+    guards = strategy.get("risk_guardrails", {})
+    state_bounds = guards.get("by_state_bounds", {})
+    state_cfg = state_bounds.get(current_state, state_bounds.get("range", {}))
+    min_pct = float(state_cfg.get("min", 0.08))
+    max_pct = float(state_cfg.get("max", 0.25))
+
+    low_acc = guards.get("low_accuracy_cap", {})
+    acc_30d_threshold = float(low_acc.get("acc_30d_threshold", 0.40))
+    if acc_30d < acc_30d_threshold:
+        max_pct = min(max_pct, float(low_acc.get("max_buy_top_pct", 0.12)))
+
+    min_pct = max(0.01, min(min_pct, 0.50))
+    max_pct = max(min_pct, min(max_pct, 0.50))
+    return min_pct, max_pct, current_state
+
+
+def _build_guardrail_trace(strategy: dict, *, acc_30d: float, buy_top_pct_before: float) -> dict:
+    """构建风险护栏追踪信息，用于复盘可追溯展示。"""
+    min_pct, max_pct, current_state = _resolve_buy_top_bounds(strategy, acc_30d)
+    guards = strategy.get("risk_guardrails", {})
+    low_acc = guards.get("low_accuracy_cap", {})
+    acc_30d_threshold = float(low_acc.get("acc_30d_threshold", 0.40))
+    cap_max_pct = float(low_acc.get("max_buy_top_pct", 0.12))
+    cap_triggered = acc_30d < acc_30d_threshold
+    return {
+        "state": current_state,
+        "min_pct": min_pct,
+        "max_pct": max_pct,
+        "buy_top_pct_before": float(buy_top_pct_before),
+        "buy_top_pct_after": float(buy_top_pct_before),
+        "cap_triggered": cap_triggered,
+        "acc_30d": float(acc_30d),
+        "acc_30d_threshold": acc_30d_threshold,
+        "cap_max_pct": cap_max_pct,
+        "triggered": False,
+        "reasons": [],
+    }
+
+
+def format_guardrail_reasons(reasons: list[str] | tuple[str, ...] | None) -> str:
+    """将护栏触发原因 code 转为中文标签；未知 code 原样保留。"""
+    if not reasons:
+        return "无"
+    labels = [GUARDRAIL_REASON_LABELS.get(str(r), str(r)) for r in reasons if r]
+    return "、".join(labels) if labels else "无"
+
+
+def build_guardrail_trace_text(trace: dict | None) -> str:
+    """将护栏追踪结构化信息格式化为单段可读文本。"""
+    if not trace:
+        return "护栏追踪：暂无数据"
+    state = trace.get("state", "range")
+    min_pct = float(trace.get("min_pct", 0.0))
+    max_pct = float(trace.get("max_pct", 0.0))
+    before = float(trace.get("buy_top_pct_before", 0.0))
+    after = float(trace.get("buy_top_pct_after", 0.0))
+    reason_text = format_guardrail_reasons(trace.get("reasons") or [])
+    return (
+        f"护栏追踪：{state} 区间 {min_pct:.0%}~{max_pct:.0%}，"
+        f"门槛 {before:.0%}→{after:.0%}，触发原因：{reason_text}"
+    )
+
+
+def summarize_guardrail_history(history: list[dict] | None, window_days: int = 30) -> dict:
+    """汇总近 N 日护栏触发情况，供策略/复盘展示。"""
+    rows = history or []
+    if window_days <= 0:
+        window_days = 30
+    recent = rows[-window_days:]
+    total_days = len(recent)
+    events = [r for r in recent if r.get("guardrail_triggered")]
+    trigger_days = len(events)
+    trigger_rate = (trigger_days / total_days) if total_days else 0.0
+
+    reason_counts: dict[str, int] = {}
+    for r in events:
+        for code in (r.get("guardrail_reasons") or []):
+            key = str(code)
+            reason_counts[key] = reason_counts.get(key, 0) + 1
+
+    top_reasons = sorted(reason_counts.items(), key=lambda kv: kv[1], reverse=True)
+    top_reason_items = [
+        {"code": code, "label": GUARDRAIL_REASON_LABELS.get(code, code), "count": cnt}
+        for code, cnt in top_reasons
+    ]
+    recent_events = [
+        {
+            "date": r.get("date", ""),
+            "reason_text": r.get("guardrail_reason_text", "无"),
+            "buy_top_pct": r.get("buy_top_pct"),
+            "acc_7d": r.get("acc_7d"),
+        }
+        for r in events[-3:]
+    ]
+    return {
+        "window_days": window_days,
+        "total_days": total_days,
+        "trigger_days": trigger_days,
+        "trigger_rate": round(trigger_rate, 4),
+        "top_reasons": top_reason_items,
+        "recent_events": recent_events,
     }
 
 
@@ -170,6 +315,239 @@ def rolling_accuracy(window_days: int = 30) -> tuple[float, int, int]:
     return round(acc, 4), total_hits, total_buys
 
 
+def _safe_mean(values: list[float]) -> float:
+    if not values:
+        return 0.0
+    return sum(values) / len(values)
+
+
+def _compute_max_drawdown(trade_returns: list[float]) -> float:
+    """
+    基于逐笔收益率序列计算最大回撤（负数，示例 -0.12）。
+    trade_returns: [0.01, -0.02, ...]（已是小数）
+    """
+    if not trade_returns:
+        return 0.0
+    equity = 1.0
+    peak = 1.0
+    max_dd = 0.0
+    for r in trade_returns:
+        equity *= (1.0 + r)
+        if equity > peak:
+            peak = equity
+        if peak > 0:
+            dd = equity / peak - 1.0
+            if dd < max_dd:
+                max_dd = dd
+    return float(max_dd)
+
+
+def _iter_window_samples(window_days: int) -> dict:
+    """
+    聚合窗口内样本，返回监控指标原始统计所需结构。
+    仅统计推荐股中的买入信号作为精准率/收益样本；自选股不计入。
+    """
+    all_dates = list_prediction_dates()
+    recent = all_dates[-window_days:] if len(all_dates) >= window_days else all_dates
+
+    buy_returns: list[float] = []
+    buy_hits = 0
+    buy_total = 0
+
+    signal_counts = {"买入": 0, "观望": 0, "回避": 0}
+    confidence_buckets = {"高": {"hits": 0, "total": 0}, "中": {"hits": 0, "total": 0}, "低": {"hits": 0, "total": 0}}
+    prob_bins = [
+        {"label": "[0.55,0.60)", "lo": 0.55, "hi": 0.60, "hits": 0, "total": 0},
+        {"label": "[0.60,0.65)", "lo": 0.60, "hi": 0.65, "hits": 0, "total": 0},
+        {"label": "[0.65,1.00]", "lo": 0.65, "hi": 1.01, "hits": 0, "total": 0},
+    ]
+    topn = {3: {"hits": 0, "total": 0}, 5: {"hits": 0, "total": 0}, 10: {"hits": 0, "total": 0}}
+
+    rise_target = float(load_strategy().get("rise_target_pct", RISE_THRESHOLD))
+
+    for d in recent:
+        preds = load_predictions(d) or []
+        outcomes = load_outcomes(d) or {}
+        if not preds or not outcomes:
+            continue
+
+        ranked = []
+        for p in preds:
+            if p.get("watchlist"):
+                continue
+            code = p.get("code")
+            if code not in outcomes:
+                continue
+            signal = p.get("signal") or "观望"
+            signal_counts[signal] = signal_counts.get(signal, 0) + 1
+            ranked.append(p)
+
+            if signal != "买入":
+                continue
+
+            actual_pct = outcomes[code].get("actual_pct")
+            if actual_pct is None:
+                continue
+            hit = actual_pct >= rise_target
+            buy_total += 1
+            buy_hits += int(hit)
+            buy_returns.append(float(actual_pct) / 100.0)
+
+            conf = str(p.get("confidence", "") or "")
+            conf_key = conf if conf in confidence_buckets else "中"
+            confidence_buckets[conf_key]["total"] += 1
+            confidence_buckets[conf_key]["hits"] += int(hit)
+
+            rp = float(p.get("rise_prob", 0.0) or 0.0)
+            for b in prob_bins:
+                if b["lo"] <= rp < b["hi"]:
+                    b["total"] += 1
+                    b["hits"] += int(hit)
+                    break
+
+        ranked.sort(
+            key=lambda x: (
+                float(x.get("global_rank_pct", 1.0) or 1.0),
+                -float(x.get("rise_prob", 0.0) or 0.0),
+            )
+        )
+        for n in (3, 5, 10):
+            picks = [x for x in ranked[:n] if x.get("signal") == "买入"]
+            for p in picks:
+                code = p.get("code")
+                actual_pct = (outcomes.get(code) or {}).get("actual_pct")
+                if actual_pct is None:
+                    continue
+                hit = actual_pct >= rise_target
+                topn[n]["total"] += 1
+                topn[n]["hits"] += int(hit)
+
+    return {
+        "window_days": window_days,
+        "buy_hits": buy_hits,
+        "buy_total": buy_total,
+        "buy_returns": buy_returns,
+        "signal_counts": signal_counts,
+        "confidence_buckets": confidence_buckets,
+        "prob_bins": prob_bins,
+        "topn": topn,
+    }
+
+
+def build_monitor_dashboard_metrics() -> dict:
+    """构建 7日/30日监控看板指标结构化结果。"""
+    strategy = load_strategy()
+    history = strategy.get("history") or []
+    latest7 = _iter_window_samples(7)
+    latest30 = _iter_window_samples(30)
+
+    def _pack_window(raw: dict) -> dict:
+        buy_total = int(raw.get("buy_total", 0))
+        buy_hits = int(raw.get("buy_hits", 0))
+        hit_rate = (buy_hits / buy_total) if buy_total else 0.0
+        returns = raw.get("buy_returns", [])
+        avg_return = _safe_mean(returns) if returns else 0.0
+        max_dd = _compute_max_drawdown(returns)
+        rar = (avg_return / abs(max_dd)) if max_dd < 0 else None
+        return {
+            "window_days": int(raw.get("window_days", 0)),
+            "hit_rate": round(hit_rate, 4),
+            "samples": buy_total,
+            "hits": buy_hits,
+            "avg_return": round(avg_return, 4),
+            "max_drawdown": round(max_dd, 4),
+            "risk_adjusted_return": round(rar, 4) if isinstance(rar, float) else None,
+            "signal_counts": raw.get("signal_counts", {}),
+            "topn_hit_rate": {
+                f"top{n}": round((v["hits"] / v["total"]), 4) if v["total"] else 0.0
+                for n, v in raw.get("topn", {}).items()
+            },
+            "topn_samples": {f"top{n}": int(v["total"]) for n, v in raw.get("topn", {}).items()},
+            "confidence_hit_rate": {
+                k: (round(v["hits"] / v["total"], 4) if v["total"] else 0.0)
+                for k, v in (raw.get("confidence_buckets") or {}).items()
+            },
+            "confidence_samples": {k: int(v["total"]) for k, v in (raw.get("confidence_buckets") or {}).items()},
+            "prob_bin_hit_rate": {
+                b["label"]: (round(b["hits"] / b["total"], 4) if b["total"] else 0.0)
+                for b in (raw.get("prob_bins") or [])
+            },
+            "prob_bin_samples": {b["label"]: int(b["total"]) for b in (raw.get("prob_bins") or [])},
+        }
+
+    guardrail_7 = summarize_guardrail_history(history, 7)
+    guardrail_30 = summarize_guardrail_history(history, 30)
+    changes_7 = len([h for h in history[-7:] if h.get("change")])
+    changes_30 = len([h for h in history[-30:] if h.get("change")])
+    w7 = _pack_window(latest7)
+    w30 = _pack_window(latest30)
+
+    def _build_precision_alerts() -> list[dict]:
+        alerts: list[dict] = []
+        s7 = int(w7.get("samples", 0))
+        s30 = int(w30.get("samples", 0))
+        h7 = float(w7.get("hit_rate", 0.0))
+        h30 = float(w30.get("hit_rate", 0.0))
+        g7 = float(guardrail_7.get("trigger_rate", 0.0))
+        dd7 = float(w7.get("max_drawdown", 0.0))
+        dd30 = float(w30.get("max_drawdown", 0.0))
+
+        low_sample_floor = max(3, int(s30 * 0.50)) if s30 else 0
+        if (
+            s30 >= 10
+            and s7 > 0
+            and s7 < low_sample_floor
+            and h7 <= h30 + 0.02
+            and g7 >= 0.40
+        ):
+            alerts.append({
+                "level": "warning",
+                "code": "over_demotion_risk",
+                "message": (
+                    f"近7日买入样本仅 {s7}（30日 {s30}），且命中率未明显优于30日，"
+                    "存在过度降级风险，建议回调 weak 模式闸门强度。"
+                ),
+            })
+
+        if s7 >= 8 and (h30 - h7) >= 0.08:
+            alerts.append({
+                "level": "warning",
+                "code": "hit_rate_drift",
+                "message": (
+                    f"近7日命中率 {h7:.1%} 低于30日 {h30:.1%}，短期质量走弱，"
+                    "建议优先排查近期触发最多的降级来源。"
+                ),
+            })
+
+        if s7 >= 8 and (dd7 - dd30) <= -0.05:
+            alerts.append({
+                "level": "warning",
+                "code": "drawdown_drift",
+                "message": (
+                    f"近7日回撤 {dd7:.2%} 明显劣于30日 {dd30:.2%}，"
+                    "建议收紧高波动与趋势过热相关阈值。"
+                ),
+            })
+        return alerts
+
+    return {
+        "as_of": date.today().isoformat(),
+        "windows": {
+            "7d": w7,
+            "30d": w30,
+        },
+        "guardrail": {
+            "7d": guardrail_7,
+            "30d": guardrail_30,
+        },
+        "parameter_changes": {
+            "7d": changes_7,
+            "30d": changes_30,
+        },
+        "alerts": _build_precision_alerts(),
+    }
+
+
 # ── 策略优化 ──────────────────────────────────────────────
 
 def optimize(day_result: dict | None = None) -> tuple[dict, str]:
@@ -187,24 +565,30 @@ def optimize(day_result: dict | None = None) -> tuple[dict, str]:
 
     strategy["accuracy_7d"]  = acc_7d
     strategy["accuracy_30d"] = acc_30d
+    min_pct, max_pct, cur_state = _resolve_buy_top_bounds(strategy, acc_30d)
+    guardrail_trace = _build_guardrail_trace(
+        strategy,
+        acc_30d=acc_30d,
+        buy_top_pct_before=float(old_pct),
+    )
 
     change = ""
     if t7 < 3:
         change = f"买入样本不足（近7日仅 {t7} 条买入信号），暂不调整选股门槛 {old_pct:.0%}"
     elif acc_7d < TARGET_ACCURACY - 0.20:
-        new_pct = max(0.08, round(old_pct - 0.01, 4))
+        new_pct = max(min_pct, round(old_pct - 0.01, 4))
         strategy["buy_top_pct"] = new_pct
         change = (f"近7日买入精准率 {acc_7d:.1%} 远低于目标 {TARGET_ACCURACY:.0%}，"
                   f"选股门槛小幅收严 {old_pct:.0%} → {new_pct:.0%}")
     elif acc_7d < TARGET_ACCURACY:
         change = f"近7日买入精准率 {acc_7d:.1%} 低于目标，策略维持选股门槛 {old_pct:.0%}"
     elif acc_7d > TARGET_ACCURACY + 0.10:
-        new_pct = min(0.25, round(old_pct + 0.02, 4))
+        new_pct = min(max_pct, round(old_pct + 0.02, 4))
         strategy["buy_top_pct"] = new_pct
         change = (f"近7日买入精准率 {acc_7d:.1%} 远超目标，"
                   f"选股门槛放宽 {old_pct:.0%} → {new_pct:.0%}（挖掘更多机会）")
     elif acc_7d > TARGET_ACCURACY:
-        new_pct = min(0.25, round(old_pct + 0.01, 4))
+        new_pct = min(max_pct, round(old_pct + 0.01, 4))
         strategy["buy_top_pct"] = new_pct
         change = (f"近7日买入精准率 {acc_7d:.1%} 达标，"
                   f"选股门槛微放宽 {old_pct:.0%} → {new_pct:.0%}")
@@ -213,17 +597,35 @@ def optimize(day_result: dict | None = None) -> tuple[dict, str]:
 
     # 自救机制：若 buy_top_pct 连续处于 0.08 下限超过 7 天，强制重置为 0.15
     new_pct_after = strategy.get("buy_top_pct", old_pct)
+    clamped_pct = min(max(new_pct_after, min_pct), max_pct)
+    if clamped_pct != new_pct_after:
+        strategy["buy_top_pct"] = round(clamped_pct, 4)
+        change += f"  🛡 风险护栏生效（{cur_state}）→ 门槛限制到 {clamped_pct:.0%}"
+        guardrail_trace["triggered"] = True
+        guardrail_trace["reasons"].append("state_bound_clamp")
+    new_pct_after = strategy.get("buy_top_pct", old_pct)
+    guardrail_trace["buy_top_pct_after"] = float(new_pct_after)
     floor_days = strategy.get("floor_days", 0)
-    if new_pct_after <= 0.08:
+    if new_pct_after <= min_pct:
         floor_days += 1
         strategy["floor_days"] = floor_days
         if floor_days >= 7 and t7 >= 3:
-            strategy["buy_top_pct"] = 0.15
+            reset_pct = min(max(0.15, min_pct), max_pct)
+            strategy["buy_top_pct"] = round(reset_pct, 4)
             strategy["floor_days"] = 0
-            change += f"  ⚠️ 门槛已在下限 7 天，自动重置为 15% 重新探索"
+            change += f"  ⚠️ 门槛已在下限 7 天，自动重置为 {reset_pct:.0%} 重新探索"
+            guardrail_trace["triggered"] = True
+            guardrail_trace["reasons"].append("floor_reset")
     else:
         strategy["floor_days"] = 0
 
+    if guardrail_trace["cap_triggered"]:
+        guardrail_trace["triggered"] = True
+        guardrail_trace["reasons"].append("low_acc_30d_cap")
+    guardrail_trace["reasons"] = list(dict.fromkeys(guardrail_trace.get("reasons") or []))
+    guardrail_trace["reason_text"] = format_guardrail_reasons(guardrail_trace["reasons"])
+    guardrail_trace["summary"] = build_guardrail_trace_text(guardrail_trace)
+    strategy["last_guardrail_trace"] = guardrail_trace
     strategy["last_updated"] = datetime.now().isoformat()
     today_str = (day_result or {}).get("date", date.today().isoformat())
     new_entry = {
@@ -233,6 +635,9 @@ def optimize(day_result: dict | None = None) -> tuple[dict, str]:
         "samples_7":   t7,
         "buy_top_pct": strategy.get("buy_top_pct", old_pct),
         "change":      change,
+        "guardrail_triggered": bool(guardrail_trace.get("triggered")),
+        "guardrail_reason_text": guardrail_trace.get("reason_text", "无"),
+        "guardrail_reasons": list(guardrail_trace.get("reasons") or []),
     }
     # 同一天只保留最后一条（覆盖旧记录）
     hist = [h for h in strategy.setdefault("history", []) if h.get("date") != today_str]
@@ -259,6 +664,10 @@ def build_review_report(date_str: str) -> dict:
         "date":        date_str,
         "day_result":  day_result,
         "strategy":    strategy,
+        "guardrail_trace": strategy.get("last_guardrail_trace", {}),
+        "guardrail_trace_text": build_guardrail_trace_text(strategy.get("last_guardrail_trace", {})),
+        "guardrail_summary": summarize_guardrail_history(strategy.get("history") or [], 30),
+        "dashboard_metrics": build_monitor_dashboard_metrics(),
         "change_desc": change_desc,
         "acc_7d":      acc_7d,
         "acc_30d":     acc_30d,

@@ -118,6 +118,10 @@ def run():
         print(f"[review] 今日命中率: {dr['accuracy']:.1%} ({dr['hits']}/{dr['total']})")
     print(f"[review] 近7日: {report['acc_7d']:.1%}  近30日: {report['acc_30d']:.1%}")
     print(f"[review] 策略调整: {report['change_desc']}")
+    trace = report.get("guardrail_trace", {})
+    trace_text = report.get("guardrail_trace_text", "")
+    if trace or trace_text:
+        print(f"[review] {trace_text or trace}")
 
     # ── 推送飞书 ──────────────────────────────────────────
     webhook = cfg.get("feishu", {}).get("webhook_url", "")
