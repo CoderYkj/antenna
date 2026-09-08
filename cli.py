@@ -487,13 +487,20 @@ def cmd_backtest(args, config):
                     rx = row.iloc[0]
                     op = float(rx["open"])
                     cl = float(rx["close"])
-                    outcomes[code] = {
+                    outcome = {
                         "actual_open":  op,
                         "actual_close": cl,
                         "actual_high":  float(rx["high"]),
                         "actual_low":   float(rx["low"]),
                         "actual_pct":   round((cl / op - 1) * 100, 2) if op else 0,
                     }
+                    future = df[df["date"] >= pred_date].head(5)
+                    if len(future) >= 5:
+                        from learning.outcome_metrics import compute_5d_metrics
+                        metrics = compute_5d_metrics(future["close"].tolist())
+                        if metrics:
+                            outcome.update(metrics)
+                    outcomes[code] = outcome
             except Exception:
                 pass
         if outcomes:

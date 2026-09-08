@@ -35,6 +35,16 @@ logger = logging.getLogger(__name__)
 MarketState = Literal["bull", "bear", "range"]
 STATES: tuple[MarketState, ...] = ("bull", "bear", "range")
 
+
+def _outcome_tier(outcome: dict) -> str | None:
+    """Return a tier aligned with the five-day target when available."""
+    if not isinstance(outcome, dict):
+        return None
+    if outcome.get("hit_5d") is not None:
+        return compute_hit_tier(outcome.get("hit_5d"))
+    return outcome.get("hit_tier") or compute_hit_tier(outcome.get("actual_pct"))
+
+
 # ── 路径常量 ────────────────────────────────────────────────
 CONFIG_PATH    = Path("learning/model_learner.yaml")
 STATE_FILE     = Path("learning/model_learner.json")
@@ -226,7 +236,7 @@ def build_history_lookup(cutoff_date: str, source_dir: Path | None = None) -> di
                 code = r.get("code")
                 if not code:
                     continue
-                tier = r.get("hit_tier") or compute_hit_tier(r.get("actual_pct"))
+                tier = _outcome_tier(r)
                 signal = pred_signal.get(code)
                 table.setdefault(code, []).append((date_str, signal, tier))
 
@@ -389,7 +399,7 @@ def _collect_calibration_samples(
             state = market_state.DEFAULT_STATE
 
         for code, o in outcomes.items():
-            tier = o.get("hit_tier") or compute_hit_tier(o.get("actual_pct"))
+            tier = _outcome_tier(o)
             if tier is None:
                 continue
             features_row = _rebuild_features_for(code, d)
@@ -589,7 +599,7 @@ def _compute_recent_buy_accuracy(date_str: str, lookback_days: int) -> tuple[flo
             o = outcomes.get(p.get("code"))
             if not o:
                 continue
-            tier = o.get("hit_tier") or compute_hit_tier(o.get("actual_pct"))
+            tier = _outcome_tier(o)
             if tier is None:
                 continue
             total += 1

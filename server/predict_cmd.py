@@ -3745,7 +3745,7 @@ def cmd_backtest_bot(arg: str = None, top_n: int = 10,
             } for r in top]
             log_predictions(pred_str, snapshot)
 
-            # 取次日实际价格
+            # 记录次日兼容字段，并同时写入模型训练目标的 5 日指标。
             outcomes = {}
             for r in top:
                 code = r["code"]
@@ -3757,13 +3757,20 @@ def cmd_backtest_bot(arg: str = None, top_n: int = 10,
                         rx = row.iloc[0]
                         op = float(rx["open"])
                         cl = float(rx["close"])
-                        outcomes[code] = {
+                        outcome = {
                             "actual_open":  op,
                             "actual_close": cl,
                             "actual_high":  float(rx["high"]),
                             "actual_low":   float(rx["low"]),
                             "actual_pct":   round((cl / op - 1) * 100, 2) if op else 0,
                         }
+                        future = df[df["date"] >= pred_date].head(5)
+                        if len(future) >= 5:
+                            from learning.outcome_metrics import compute_5d_metrics
+                            metrics = compute_5d_metrics(future["close"].tolist())
+                            if metrics:
+                                outcome.update(metrics)
+                        outcomes[code] = outcome
                 except Exception:
                     pass
             if outcomes:
@@ -4229,4 +4236,3 @@ def cmd_train(arg: str | None, chat_id: str = "") -> str:
         f"🏋 开始{mode_text} · 后台运行中（预计 10-20 分钟）\n"
         f"完成后会主动推送结果，请勿重复发送。"
     )
-

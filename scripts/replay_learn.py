@@ -116,7 +116,12 @@ def _collect_bucket_samples(
             o = outcomes.get(p.get("code"))
             if not o:
                 continue
-            tier = o.get("hit_tier") or compute_hit_tier(o.get("actual_pct"))
+            # Prefer the five-day target used by the model; retain legacy fallback.
+            tier = (
+                compute_hit_tier(o.get("hit_5d"))
+                if o.get("hit_5d") is not None
+                else o.get("hit_tier") or compute_hit_tier(o.get("actual_pct"))
+            )
             if tier is None:
                 continue
             samples.append((float(prob), _is_hit(tier), p.get("scene") or "scan"))

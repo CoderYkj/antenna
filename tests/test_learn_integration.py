@@ -58,6 +58,28 @@ def test_outcome_metrics_end_to_end(tmp_path, monkeypatch):
     assert loaded["600519"]["hit_5d"] == 7.0
 
 
+def test_optimizer_prefers_five_day_outcome(tmp_path, monkeypatch):
+    """Strategy accuracy must use the model's five-day target when available."""
+    from learning import optimizer, tracker
+
+    monkeypatch.setattr(tracker, "DATA_DIR", tmp_path)
+    monkeypatch.setattr(optimizer, "STRATEGY_FILE", tmp_path / "strategy.json")
+    tracker.log_predictions("2026-04-27", [
+        {"code": "A", "signal": "买入", "rise_prob": 0.7, "scene": "scan"},
+        {"code": "B", "signal": "买入", "rise_prob": 0.6, "scene": "scan"},
+    ])
+    tracker.log_outcomes("2026-04-27", {
+        "A": {"actual_pct": 3.0, "hit_5d": 1.0},
+        "B": {"actual_pct": 0.0, "hit_5d": 2.5},
+    })
+
+    result = optimizer.evaluate_day("2026-04-27")
+
+    assert result["hits"] == 1
+    assert result["total"] == 2
+    assert result["accuracy"] == 0.5
+
+
 def test_orchestrator_runs_market_state_with_real_data(tmp_path, monkeypatch):
     """验证编排器真能调用 market_state.run(含防御 — 若拿不到数据,fail 但不崩)。"""
     from learning import orchestrator, alerts

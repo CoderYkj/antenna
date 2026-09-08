@@ -2,7 +2,7 @@
 optimizer.py - 基于历史买入信号精准率，动态调整"买入"信号的相对百分位门槛。
 
 核心指标：买入精准率（Precision）
-  = 被标记为"买入"且实际涨幅 >= RISE_THRESHOLD 的股票数 / 全部"买入"信号数
+  = 被标记为"买入"且未来 5 日涨幅 >= 2% 的股票数 / 全部"买入"信号数
   只追踪买入信号，彻底规避「观望 bias」
   （观望/回避信号占多数，若也计入准确率，在震荡市中会虚高）
 
@@ -27,7 +27,8 @@ from learning.market_state import load_current_state
 
 STRATEGY_FILE   = Path("learning/strategy.json")
 TARGET_ACCURACY = 0.55   # 目标买入精准率（A股短线现实水平）
-RISE_THRESHOLD  = 1.0    # 买入命中 = 实际涨幅 >= 此值（%，从1.5%降至1.0%更贴近实际）
+RISE_THRESHOLD  = 1.0    # 旧次日 outcome 的兼容阈值（%）
+FIVE_DAY_TARGET = 2.0    # 模型训练目标：未来 5 个交易日累计涨幅（%）
 GUARDRAIL_REASON_LABELS = {
     "state_bound_clamp": "状态区间限幅",
     "low_acc_30d_cap": "30日低精准率上限收敛",
@@ -106,6 +107,29 @@ def _merge_with_defaults(strategy: dict) -> dict:
         else:
             merged[k] = v
     return merged
+
+
+def _outcome_hit(outcome: dict, *, rise_target: float = RISE_THRESHOLD) -> bool | None:
+    """Evaluate an outcome using the model target, with legacy fallback.
+
+    New outcomes contain ``hit_5d`` (five trading day cumulative return).
+    Older records only contain next-day ``actual_pct`` and remain readable.
+    """
+    if not isinstance(outcome, dict):
+            return None
+    hit_5d = outcome.get("hit_5d")
+    if hit_5d is not None:
+            try:
+                return float(hit_5d) >= FIVE_DAY_TARGET
+            except (TypeError, ValueError):
+                return None
+    actual_pct = outcome.get("actual_pct")
+    if actual_pct is None:
+            return None
+    try:
+            return float(actual_pct) >= rise_target
+    except (TypeError, ValueError):
+            return None
 
 
 def _resolve_buy_top_bounds(strategy: dict, acc_30d: float) -> tuple[float, float, str]:
@@ -258,23 +282,21 @@ def evaluate_day(date_str: str) -> dict | None:
         else:
             is_buy = pred["rise_prob"] >= threshold
 
-        actual_pct = outcomes[code].get("actual_pct")
-        if actual_pct is None:
+        outcome = outcomes[code]
+        hit = _outcome_hit(outcome, rise_target=rise_target)
+        if hit is None:
             # 停牌或缺数据，跳过不计入精准率
             continue
 
-        # 推荐股：买入命中=涨，观望/回避命中=未涨（正确回避），均计入准确率
-        # 自选股：按信号计算命中，供显示用，不计入策略优化计数器
+        # 策略准确率只统计推荐池中的买入信号；回避率单独用于展示。
+        # 自选股按信号计算命中，但不计入策略优化计数器。
         if is_watchlist:
-            hit = (actual_pct >= rise_target) if is_buy else (actual_pct < rise_target)
+            hit = hit if is_buy else not hit
         elif is_buy:
-            hit = (actual_pct >= rise_target)
             hits  += int(hit)
             total += 1
         else:
-            hit = (actual_pct < rise_target)  # 观望/回避正确回避也算命中
-            hits  += int(hit)
-            total += 1
+            hit = not hit  # 正确回避仅供展示，不混入买入精准率
 
         details.append({
             "code":        code,
@@ -285,7 +307,9 @@ def evaluate_day(date_str: str) -> dict | None:
             "rise_prob":   pred["rise_prob"],
             "pred_high":   pred.get("pred_high"),
             "pred_low":    pred.get("pred_low"),
-            "actual_pct":  round(actual_pct, 2),
+            "actual_pct":  round(float(outcome.get("actual_pct")), 2)
+            if outcome.get("actual_pct") is not None else None,
+            "actual_pct_5d": outcome.get("hit_5d"),
             "hit":         hit,           # None = 不计入精准率
         })
 
@@ -390,13 +414,17 @@ def _iter_window_samples(window_days: int) -> dict:
             if signal != "买入":
                 continue
 
-            actual_pct = outcomes[code].get("actual_pct")
-            if actual_pct is None:
+            outcome = outcomes[code]
+            hit = _outcome_hit(outcome, rise_target=rise_target)
+            if hit is None:
                 continue
-            hit = actual_pct >= rise_target
             buy_total += 1
             buy_hits += int(hit)
-            buy_returns.append(float(actual_pct) / 100.0)
+            return_pct = outcome.get("hit_5d")
+            if return_pct is None:
+                return_pct = outcome.get("actual_pct")
+            if return_pct is not None:
+                buy_returns.append(float(return_pct) / 100.0)
 
             conf = str(p.get("confidence", "") or "")
             conf_key = conf if conf in confidence_buckets else "中"
@@ -420,10 +448,10 @@ def _iter_window_samples(window_days: int) -> dict:
             picks = [x for x in ranked[:n] if x.get("signal") == "买入"]
             for p in picks:
                 code = p.get("code")
-                actual_pct = (outcomes.get(code) or {}).get("actual_pct")
-                if actual_pct is None:
+                outcome = outcomes.get(code) or {}
+                hit = _outcome_hit(outcome, rise_target=rise_target)
+                if hit is None:
                     continue
-                hit = actual_pct >= rise_target
                 topn[n]["total"] += 1
                 topn[n]["hits"] += int(hit)
 
