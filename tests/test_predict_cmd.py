@@ -264,6 +264,20 @@ def test_cmd_scan_bot_alt_fetch_failure_does_not_crash():
     assert alt_passed == {}, f"Expected empty dict on alt fetch failure, got {alt_passed!r}"
 
 
+def test_cmd_scan_bot_rejects_overlapping_scan():
+    """同一进程内已有扫描时，不应再次启动后台扫描并广播重复结果。"""
+    from server.predict_cmd import _scan_lock, cmd_scan_bot
+
+    assert _scan_lock.acquire(blocking=False)
+    try:
+        result = cmd_scan_bot(top_n=1)
+    finally:
+        _scan_lock.release()
+
+    assert result["msg_type"] == "text"
+    assert "正在进行" in result["content"]
+
+
 # ── cmd_predict 单股 alt 注入 ────────────────────────────────
 
 def _build_predict_patches(code: str, alt_data: dict, alt_side_effect=None):

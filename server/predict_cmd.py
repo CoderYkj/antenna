@@ -10,6 +10,10 @@ from datetime import datetime, time as dtime, timedelta
 
 log = logging.getLogger(__name__)
 
+# A full recommendation scan is expensive and its completion is broadcast to
+# every configured chat. Prevent duplicate scans from producing multiple cards.
+_scan_lock = threading.Lock()
+
 
 def _log_critical_error(tag: str, exc: Exception) -> None:
     """记录后台线程异常:既写常规日志(log.exception),也追加一条不受
@@ -2168,6 +2172,15 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
     from data.fetcher import cached_codes
     from learning.optimizer import load_strategy
 
+    if not _scan_lock.acquire(blocking=False):
+        return {
+            "msg_type": "text",
+            "content": json.dumps(
+                {"text": "已有推荐扫描正在进行，请等待当前结果完成后再发起新的推荐。"},
+                ensure_ascii=False,
+            ),
+        }
+
     try:
         _cfg = _load_cfg()
         pool_cfg = _cfg.get("universe", {}).get("scan_pool", "watchlist")
@@ -2209,6 +2222,8 @@ def cmd_scan_bot(top_n: int = 5) -> dict:
             _log_critical_error("[推荐] 后台扫描失败", e)
             result = {"msg_type": "text", "content": json.dumps(
                 {"text": f"推荐扫描失败：{e}"}, ensure_ascii=False)}
+        finally:
+            _scan_lock.release()
         if result is None:
             return  # 数据未就绪或已去重，静默跳过
         from server.feishu_push import push as _push
