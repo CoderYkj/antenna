@@ -2257,6 +2257,28 @@ def _cmd_scan_bot_impl(top_n: int = 5) -> dict:
     pool_cfg = cfg.get("universe", {}).get("scan_pool", "watchlist")
     if pool_cfg == "all":
         codes = cached_codes()
+        try:
+            expected_codes = load_universe(cfg)
+        except Exception:
+            expected_codes = []
+        min_cached = max(50, int(len(expected_codes) * 0.80)) if expected_codes else 50
+        if len(codes) < min_cached:
+            log.warning(
+                "[推荐] 缓存未就绪：%d/%d（最低要求 %d），跳过本次扫描",
+                len(codes), len(expected_codes), min_cached,
+            )
+            return {
+                "msg_type": "text",
+                "content": json.dumps(
+                    {
+                        "text": (
+                            f"推荐暂缓：行情缓存仅 {len(codes)}/{len(expected_codes) or '?'} 只，"
+                            f"低于扫描要求 {min_cached} 只。请先完成数据预热后再扫描。"
+                        )
+                    },
+                    ensure_ascii=False,
+                ),
+            }
     else:
         codes = load_universe(cfg)
 
@@ -2378,6 +2400,7 @@ def _cmd_scan_bot_impl(top_n: int = 5) -> dict:
     # 候选池：优先选财务缓存命中 + 预筛分高的买入股，无缓存则按 AI 分补充
     # 目标：从全部买入信号中找既有 AI 信号又有基本面支撑的股票送去战法评分
     n_buy = sum(1 for r in results if r.get("signal") == "买入")
+    valid_count = len(results)
     pool_size = top_n * 4
     try:
         from data.fin_cache import get as _fc_get, score as _fc_score
@@ -2577,7 +2600,7 @@ def _cmd_scan_bot_impl(top_n: int = 5) -> dict:
                 f"今日无买入信号，" + ("以下为战法认可的观望标的，供候选参考。\n" if tier_watch else "建议观望。\n")
             )
         _watch_elements = [{"tag": "markdown", "content": (
-            f"共扫描 **{total}** 只，AI 买入信号 **{n_buy}** 只。\n"
+            f"共扫描 **{total}** 只（有效结果 **{valid_count}** 只），AI 买入信号 **{n_buy}** 只。\n"
             + _no_signal_reason
             + f"市场状态 **{_current_state}**{_active_cnt_str}\n"
             + _guardrail_line
@@ -2622,7 +2645,7 @@ def _cmd_scan_bot_impl(top_n: int = 5) -> dict:
     elements.append({
         "tag": "markdown",
         "content": (
-            f"共扫描 **{total}** 只，AI 买入信号 **{n_buy}** 只。\n"
+            f"共扫描 **{total}** 只（有效结果 **{valid_count}** 只），AI 买入信号 **{n_buy}** 只。\n"
             f"战法筛选后推荐 **{len(top)}** 只（★共振 {len(tier1)} / ★单战法 {len(tier2)}）\n"
             f"市场状态 **{_current_state}**{_active_cnt_str}\n"
             f"{_guardrail_line}"
