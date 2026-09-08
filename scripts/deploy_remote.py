@@ -74,6 +74,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="部署时传入 SKIP_SMOKE_TEST=1",
     )
+    parser.add_argument(
+        "--allow-dirty",
+        action="store_true",
+        help="远端存在运行时文件变更时继续部署",
+    )
     return parser
 
 
@@ -143,6 +148,8 @@ def _deploy(args: argparse.Namespace) -> None:
     deploy_flags = "SKIP_GIT_PULL=1 ROLLBACK_ON_FAILURE=1 AUTO_TRAIN_IF_MISSING=1"
     if args.skip_smoke_test:
         deploy_flags += " SKIP_SMOKE_TEST=1"
+    if args.allow_dirty:
+        deploy_flags += " ALLOW_DIRTY=1"
 
     ssh = None
     sftp = None
